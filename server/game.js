@@ -3,7 +3,7 @@ const S = require('../public/js/shared.js');
 
 const TICK_MS = 50;
 const BOSS_INTERVAL_MS = 4 * 60 * 1000;
-const RESPAWN_DELAY_MS = 3000;
+const RESPAWN_DELAY_MS = S.RESPAWN_SECONDS * 1000;
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -108,8 +108,9 @@ class Game {
       maxHp: stats.maxHp, hp: stats.maxHp, dmgMult: stats.dmgMult, armor: stats.armor,
       x: S.SPAWN.x + rand(-100, 100), y: S.SPAWN.y, facing: 1, anim: 'idle',
       dead: false, deadAt: 0, cds: [0, 0, 0, 0], atkSeq: 0, atkSlot: 0,
-      stealthUntil: 0, invulnUntil: now + 2000, ironWallUntil: 0, hitIframeUntil: 0, lastHurt: 0,
-      backstabReady: false, lastChat: 0, lastSave: now,
+      stealthUntil: 0, invulnUntil: now + 2000, ironWillUntil: 0, hitIframeUntil: 0, lastHurt: 0,
+      divineUntil: 0, divineTickAt: 0, auraHealed: 0, guardianUntil: 0, guardianTickAt: 0,
+      lastChat: 0, lastSave: now,
     };
     if (this.players.size === 0 && this.nextBossAt < now) this.nextBossAt = now + 90 * 1000;
     this.players.set(socket.id, p);
@@ -292,7 +293,7 @@ class Game {
   hurtPlayer(p, amount, fromX, now, ignoreIframe) {
     if (p.dead || now < p.invulnUntil || now < p.stealthUntil) return;
     if (!ignoreIframe && now < p.hitIframeUntil) return;
-    let dmg = amount * (1 - p.armor) * (now < p.ironWallUntil ? 0.4 : 1) * rand(0.9, 1.1);
+    let dmg = amount * (1 - p.armor) * (now < p.ironWillUntil ? 0.4 : 1) * rand(0.9, 1.1);
     dmg = Math.max(1, Math.round(dmg));
     p.hp -= dmg;
     p.hitIframeUntil = now + 800;
@@ -431,8 +432,8 @@ class Game {
         for (const m of this.monstersInCircle(p.x, p.y - 30, 145)) this.damageMonster(m, 42, p, { kb: sign(m.x - p.x) * 240 });
         this.addFx({ t: 'whirl', x: p.x, y: p.y - 30 });
         break;
-      case 'fighter3':
-        p.ironWallUntil = now + 5000;
+      case 'fighter3': // Iron Will: 10s of 60% damage reduction + regenerate 10% max HP over the duration
+        p.ironWillUntil = now + 10000;
         this.addFx({ t: 'shield', x: p.x, y: p.y });
         break;
       // ---- Mage ----
@@ -453,22 +454,19 @@ class Game {
         for (const m of this.monstersInCircle(p.x, p.y - 25, 175)) this.damageMonster(m, 15, p, { freeze: 2500 });
         this.addFx({ t: 'nova', x: p.x, y: p.y - 25, r: 175 });
         break;
-      case 'mage3':
-        this.zones.push({ id: this.nid++, type: 'slow', owner: p.sid, x: p.x + f * 170, y: p.y, r: 150, until: now + 5000, tickAt: 0 });
+      case 'mage3': // Magic Shield: a dome where the mage and allies are invulnerable
+        this.zones.push({ id: this.nid++, type: 'shield', owner: p.sid, x: p.x, y: p.y, r: 130, until: now + 4000 });
+        this.addFx({ t: 'burst', x: p.x, y: p.y - 30 });
         break;
       // ---- Rogue ----
       case 'rogue0': {
         const stealthed = now < p.stealthUntil;
-        let hitAny = false;
         for (const m of this.monstersInBox(...this.frontBox(p, 80, 70))) {
           let mult = 1, crit = false;
           if (stealthed) { mult = 3.5; crit = true; }
-          else if (p.backstabReady) { mult = 2.2; crit = true; }
-          else if (m.facing === f) mult = 1.5; // striking from behind
+          else if (m.facing === f) { mult = 1.5; crit = true; } // striking from behind always crits
           this.damageMonster(m, 20, p, { mult, crit, kb: f * 60 });
-          hitAny = true;
         }
-        if (hitAny) p.backstabReady = false;
         if (stealthed) p.stealthUntil = 0;
         this.addFx({ t: 'slash', x: p.x, y: p.y, f, c: p.cls, big: stealthed ? 1 : 0 });
         break;
@@ -482,27 +480,11 @@ class Game {
         p.invulnUntil = now + 450;
         this.addFx({ t: 'dust', x: p.x, y: p.y });
         break;
-      case 'rogue3': {
-        let best = null, bd = 430;
-        for (const m of this.monsters.values()) {
-          const d = Math.hypot(m.x - p.x, m.y - p.y);
-          if (d < bd) { bd = d; best = m; }
-        }
-        if (!best) {
-          p.cds[slot] = 0;
-          p.socket.emit('cdReset', { slot, msg: 'No enemy close enough!' });
-          break;
-        }
-        const plat = S.PLATFORMS[best.plat];
-        const tx = clamp(best.x - best.facing * (best.w / 2 + 22), plat.x + 5, plat.x + plat.w - 5);
-        this.addFx({ t: 'smoke', x: p.x, y: p.y });
-        p.x = tx; p.y = best.y; p.facing = sign(best.x - tx);
-        p.backstabReady = true;
-        p.invulnUntil = now + 300;
-        p.socket.emit('teleport', { x: p.x, y: p.y, f: p.facing });
-        this.addFx({ t: 'smoke', x: p.x, y: p.y });
+      case 'rogue3': // Fan of Knives: knives burst out in every direction, then a brief invulnerability
+        for (const m of this.monstersInCircle(p.x, p.y - 30, 200)) this.damageMonster(m, 32, p, { kb: sign(m.x - p.x) * 140 });
+        p.invulnUntil = Math.max(p.invulnUntil, now + 1500);
+        this.addFx({ t: 'knives', x: p.x, y: p.y - 30, r: 200 });
         break;
-      }
       // ---- Marksman ----
       case 'marksman0':
         this.shoot(p, 'arrow', { vx: f * 1000, dmg: 22, life: 0.9 });
@@ -513,12 +495,12 @@ class Game {
           this.shoot(p, 'arrow', { vx: f * 950 * Math.cos(a), vy: 950 * Math.sin(a), dmg: 16, life: 0.7 });
         }
         break;
-      case 'marksman2':
-        this.shoot(p, 'pierce', { vx: f * 1400, dmg: 60, life: 0.8, pierce: true, r: 16 });
-        break;
-      case 'marksman3':
+      case 'marksman2': // Disengage
         for (const m of this.monstersInCircle(p.x, p.y - 25, 140)) this.damageMonster(m, 10, p, { kb: sign(m.x - p.x) * 380, slow: 0.5, slowMs: 2000 });
         this.addFx({ t: 'burst', x: p.x, y: p.y - 25 });
+        break;
+      case 'marksman3': // Piercing Shot: big, wide arrow that pierces everything in its path
+        this.shoot(p, 'pierce', { vx: f * 1300, dmg: 95, life: 0.85, pierce: true, r: 42 });
         break;
       // ---- Druid ----
       case 'druid0':
@@ -530,29 +512,91 @@ class Game {
         this.addFx({ t: 'entangle', x: cx, y: p.y, r: 185 });
         break;
       }
-      case 'druid2': {
-        let healedOthers = 0;
-        for (const o of this.players.values()) {
-          if (o.dead || Math.hypot(o.x - p.x, o.y - p.y) > 270) continue;
-          const amt = Math.min(o.maxHp - o.hp, Math.round(o.maxHp * 0.3 + 10 * p.dmgMult));
-          o.hp += amt;
-          if (amt > 0) this.addFx({ t: 'dmg', x: o.x, y: o.y - 70, v: amt, k: 'h' });
-          if (o !== p) healedOthers += amt;
-        }
-        const bonus = Math.floor(healedOthers / 10);
-        if (bonus > 0) {
-          p.score += bonus;
-          p.socket.emit('reward', { score: bonus, xp: 0, monster: 'healing allies', heal: true });
-          this.sendSelf(p);
-        }
+      case 'druid2':
+        this.awardHealScore(p, this.healAround(p, 270, 0.3, 10));
         this.addFx({ t: 'heal', x: p.x, y: p.y, r: 270 });
         break;
-      }
       case 'druid3':
         this.summons = this.summons.filter((s) => s.owner !== p.sid);
         this.summons.push({ id: this.nid++, owner: p.sid, x: p.x - f * 40, y: p.y - 70, f, until: now + 15000, atkAt: 0 });
         this.addFx({ t: 'summon', x: p.x - f * 40, y: p.y - 70 });
         break;
+      // ---- Paladin ----
+      case 'paladin0': { // Holy Strike: single target
+        const m = this.nearestInFront(p, 95, 85);
+        if (m) this.damageMonster(m, 34, p, { kb: f * 120 });
+        this.addFx({ t: 'slash', x: p.x, y: p.y, f, c: p.cls });
+        break;
+      }
+      case 'paladin1': // Divine Aura: 5s of pulsing heals around the paladin
+        p.divineUntil = now + 5000;
+        p.divineTickAt = now;
+        this.addFx({ t: 'heal', x: p.x, y: p.y, r: 230 });
+        break;
+      case 'paladin2': { // Righteous Blow: big single-target hit + stun
+        const m = this.nearestInFront(p, 100, 90);
+        if (m) {
+          this.damageMonster(m, 80, p, { stun: 2000, kb: f * 260 });
+          this.addFx({ t: 'smite', x: m.x, y: m.y });
+        }
+        this.addFx({ t: 'slash', x: p.x, y: p.y, f, c: p.cls, big: 1 });
+        break;
+      }
+      case 'paladin3': // Guardian Spirits: 6s holy aura that damages nearby foes
+        p.guardianUntil = now + 6000;
+        p.guardianTickAt = now;
+        this.addFx({ t: 'summon', x: p.x, y: p.y - 40 });
+        break;
+    }
+  }
+
+  nearestInFront(p, reach, height) {
+    let best = null, bd = Infinity;
+    for (const m of this.monstersInBox(...this.frontBox(p, reach, height))) {
+      const d = Math.abs(m.x - p.x);
+      if (d < bd) { bd = d; best = m; }
+    }
+    return best;
+  }
+
+  // Heals every living player within r of p by frac of their max HP (+flat, scaled by level). Returns HP healed on others.
+  healAround(p, r, frac, flat) {
+    let healedOthers = 0;
+    for (const o of this.players.values()) {
+      if (o.dead || Math.hypot(o.x - p.x, o.y - p.y) > r) continue;
+      const amt = Math.min(o.maxHp - o.hp, Math.round(o.maxHp * frac + flat * p.dmgMult));
+      if (amt <= 0) continue;
+      o.hp += amt;
+      this.addFx({ t: 'dmg', x: o.x, y: o.y - 70, v: amt, k: 'h' });
+      if (o !== p) healedOthers += amt;
+    }
+    return healedOthers;
+  }
+
+  awardHealScore(p, healedOthers) {
+    const bonus = Math.floor(healedOthers / 10);
+    if (bonus <= 0) return;
+    p.score += bonus;
+    p.socket.emit('reward', { score: bonus, xp: 0, monster: 'healing allies', heal: true });
+    this.sendSelf(p);
+  }
+
+  updatePlayerEffects(p, dt, now) {
+    if (p.dead) { p.divineUntil = p.guardianUntil = 0; }
+    // Iron Will regen: 10% max HP over 10s
+    if (!p.dead && now < p.ironWillUntil) p.hp = Math.min(p.maxHp, p.hp + p.maxHp * 0.01 * dt);
+    // Divine Aura: heal pulse every 0.5s (10 pulses ≈ 30% HP); score for healing others is paid when it ends
+    if (now < p.divineUntil && now >= p.divineTickAt) {
+      p.divineTickAt = now + 500;
+      p.auraHealed = (p.auraHealed || 0) + this.healAround(p, 230, 0.03, 2);
+    } else if (now >= p.divineUntil && p.auraHealed) {
+      this.awardHealScore(p, p.auraHealed);
+      p.auraHealed = 0;
+    }
+    // Guardian Spirits: damage pulse every 0.5s
+    if (now < p.guardianUntil && now >= p.guardianTickAt) {
+      p.guardianTickAt = now + 500;
+      for (const m of this.monstersInCircle(p.x, p.y - 30, 160)) this.damageMonster(m, 11, p);
     }
   }
 
@@ -606,17 +650,15 @@ class Game {
     }
     this.projectiles = this.projectiles.filter((p) => p.life > 0);
 
-    // zones (Slow Field)
+    // zones (Magic Shield): players standing inside are invulnerable
     for (const z of this.zones) {
-      const owner = this.players.get(z.owner);
-      const inZone = this.monstersInCircle(z.x, z.y - 30, z.r);
-      for (const m of inZone) { m.slowUntil = now + 300; m.slowFactor = 0.4; }
-      if (owner && now >= z.tickAt) {
-        z.tickAt = now + 500;
-        for (const m of inZone) this.damageMonster(m, 6, owner);
+      for (const p of this.players.values()) {
+        if (!p.dead && Math.hypot(p.x - z.x, (p.y - 30) - (z.y - 30)) < z.r) p.invulnUntil = Math.max(p.invulnUntil, now + 150);
       }
     }
     this.zones = this.zones.filter((z) => z.until > now);
+
+    for (const p of this.players.values()) this.updatePlayerEffects(p, dt, now);
 
     // summons (Nature Spirit)
     for (const s of this.summons) {
@@ -654,7 +696,8 @@ class Game {
       p: [...this.players.values()].map((p) => ({
         id: p.sid, n: p.name, c: p.cls, h: p.hair, l: p.level, x: Math.round(p.x), y: Math.round(p.y),
         f: p.facing, a: p.anim, hp: Math.ceil(p.hp), mhp: p.maxHp, sc: p.score,
-        st: now < p.stealthUntil ? 1 : 0, iw: now < p.ironWallUntil ? 1 : 0, inv: now < p.invulnUntil ? 1 : 0,
+        st: now < p.stealthUntil ? 1 : 0, iw: now < p.ironWillUntil ? 1 : 0, inv: now < p.invulnUntil ? 1 : 0,
+        da: now < p.divineUntil ? 1 : 0, gs: now < p.guardianUntil ? 1 : 0,
         d: p.dead ? 1 : 0, as: p.atkSeq, sl: p.atkSlot,
       })),
       m: [...this.monsters.values()].map((m) => ({
@@ -662,8 +705,8 @@ class Game {
         mv: m.moving ? 1 : 0, hu: now - m.hurtAt < 150 ? 1 : 0,
         s: (now < m.freezeUntil ? 'f' : '') + (now < m.stunUntil ? 's' : '') + (now < m.rootUntil ? 'r' : '') + (now < m.slowUntil ? 'w' : ''),
       })),
-      pr: this.projectiles.map((p) => ({ id: p.id, t: p.type, x: Math.round(p.x), y: Math.round(p.y), vx: p.vx, vy: p.vy })),
-      z: this.zones.map((z) => ({ id: z.id, x: z.x, y: z.y, r: z.r })),
+      pr: this.projectiles.map((p) => ({ id: p.id, t: p.type, x: Math.round(p.x), y: Math.round(p.y), vx: p.vx, vy: p.vy, r: p.r })),
+      z: this.zones.map((z) => ({ id: z.id, t: z.type, x: z.x, y: z.y, r: z.r })),
       s: this.summons.map((s) => ({ id: s.id, x: Math.round(s.x), y: Math.round(s.y), f: s.f, o: s.owner })),
       fx: this.fx,
       boss: this.bossAlive() ? 0 : Math.max(0, Math.round((this.nextBossAt - now) / 1000)),

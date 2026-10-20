@@ -34,6 +34,7 @@
     rogue: { body: '#43405e', trim: '#d6455f', belt: '#2a2840' },
     marksman: { body: '#4f9d4a', trim: '#a8743c', belt: '#6b4a26' },
     druid: { body: '#a57a44', trim: '#5fb85a', belt: '#5c3f1d' },
+    paladin: { body: '#f0c75a', trim: '#ffffff', belt: '#8a5a2b' },
   };
 
   /**
@@ -68,10 +69,16 @@
       ctx.beginPath(); ctx.moveTo(-6, -32); ctx.quadraticCurveTo(-18, -30 + Math.sin(t * 8) * 3, -24, -24 + Math.sin(t * 8 + 1) * 4);
       ctx.lineTo(-20, -20); ctx.quadraticCurveTo(-14, -26, -4, -27); ctx.fill();
     }
+    if (cls === 'paladin') { // cape
+      ctx.fillStyle = '#4f78c9'; ctx.strokeStyle = OUTLINE; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(-8, -32); ctx.quadraticCurveTo(-22, -16 + Math.sin(t * 6) * 2, -20 + Math.sin(t * 6) * 3, -2);
+      ctx.lineTo(-6, -6); ctx.closePath(); ctx.fill(); ctx.stroke();
+    }
     if (cls === 'fighter') drawShield(ctx, -9, -20, atk >= 0 && o.atkSlot === 1);
+    if (cls === 'paladin') drawShield(ctx, -9, -20, false, true);
 
     // legs
-    const legC = cls === 'fighter' ? '#6c7a92' : cls === 'mage' ? '#4b3480' : cls === 'rogue' ? '#2a2840' : cls === 'druid' ? '#6b4a26' : '#5b4126';
+    const legC = cls === 'paladin' ? '#c9a24a' : cls === 'fighter' ? '#6c7a92' : cls === 'mage' ? '#4b3480' : cls === 'rogue' ? '#2a2840' : cls === 'druid' ? '#6b4a26' : '#5b4126';
     ctx.fillStyle = legC; ctx.strokeStyle = OUTLINE; ctx.lineWidth = 1.5;
     const legLift = o.air ? -3 : 0;
     rr(ctx, -8 + walk * 4, -13 + legLift, 7, 13, 3); ctx.fill(); ctx.stroke();
@@ -97,6 +104,11 @@
     if (cls === 'fighter') { // chest plate shine + pauldron
       ctx.fillStyle = 'rgba(255,255,255,0.45)'; rr(ctx, -6, -29, 6, 9, 3); ctx.fill();
       ell(ctx, 7, -30, 7, 5, '#c3d0e4', OUTLINE, 1.5);
+    }
+    if (cls === 'paladin') { // shine + holy cross emblem
+      ctx.fillStyle = 'rgba(255,255,255,0.5)'; rr(ctx, -7, -29, 5, 8, 2.5); ctx.fill();
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(1, -29, 3, 10); ctx.fillRect(-1.5, -26, 8, 3);
+      ell(ctx, 7, -30, 7, 5, '#ffd76a', OUTLINE, 1.5);
     }
     if (cls === 'rogue') { ctx.fillStyle = of.trim; rr(ctx, -10, -33, 20, 6, 3); ctx.fill(); }
     if (cls === 'druid') { ctx.fillStyle = of.trim; ctx.beginPath(); ctx.moveTo(-10, -31); ctx.lineTo(8, -15); ctx.lineTo(4, -14); ctx.lineTo(-11, -27); ctx.fill(); }
@@ -170,6 +182,18 @@
       ctx.beginPath(); ctx.moveTo(hx - 2, hy - R - 4);
       ctx.quadraticCurveTo(hx - 10, hy - R - 22 + Math.sin(t * 5) * 2, hx - 26, hy - R - 10);
       ctx.quadraticCurveTo(hx - 14, hy - R - 8, hx - 6, hy - R + 2); ctx.closePath(); ctx.fill(); ctx.stroke();
+    } else if (cls === 'paladin') {
+      ctx.fillStyle = '#f2c94c'; ctx.strokeStyle = OUTLINE; ctx.lineWidth = 1.8;
+      ctx.beginPath(); ctx.arc(hx, hy - 3, R + 2, Math.PI * 1.02, Math.PI * 1.98); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#d9a92e'; rr(ctx, hx - R - 3, hy - 6, 2 * R + 6, 6, 3); ctx.fill(); ctx.stroke();
+      ell(ctx, hx - 7, hy - 16, 5, 3, 'rgba(255,255,255,0.7)');
+      // little white wings on the helmet
+      for (const sx of [-1, 1]) {
+        ctx.fillStyle = '#ffffff'; ctx.beginPath();
+        ctx.moveTo(hx + sx * (R - 2), hy - 12); ctx.quadraticCurveTo(hx + sx * (R + 14), hy - 30 + Math.sin(t * 5) * 1.5, hx + sx * (R + 12), hy - 14);
+        ctx.quadraticCurveTo(hx + sx * (R + 6), hy - 12, hx + sx * (R - 2), hy - 7); ctx.closePath(); ctx.fill(); ctx.stroke();
+      }
+      ell(ctx, hx, hy - R - 2, 3.5, 3.5, '#6fb4ff', OUTLINE, 1.2);
     } else if (cls === 'mage') {
       ctx.fillStyle = '#6b47c0'; ctx.strokeStyle = OUTLINE; ctx.lineWidth = 1.8;
       ell(ctx, hx, hy - 12, R + 10, 6, '#6b47c0', OUTLINE, 1.8);
@@ -222,9 +246,9 @@
     ctx.closePath(); ctx.fill();
   }
 
-  function drawShield(ctx, x, y, bashing) {
+  function drawShield(ctx, x, y, bashing, holy) {
     ctx.save(); ctx.translate(bashing ? x + 26 : x, y);
-    ctx.fillStyle = '#4f78c9'; ctx.strokeStyle = OUTLINE; ctx.lineWidth = 1.8;
+    ctx.fillStyle = holy ? '#ffffff' : '#4f78c9'; ctx.strokeStyle = OUTLINE; ctx.lineWidth = 1.8;
     ctx.beginPath(); ctx.moveTo(-10, -12); ctx.lineTo(10, -12); ctx.lineTo(10, 2); ctx.quadraticCurveTo(0, 14, -10, 2); ctx.closePath(); ctx.fill(); ctx.stroke();
     ctx.strokeStyle = '#f2c94c'; ctx.lineWidth = 2.2;
     ctx.beginPath(); ctx.moveTo(0, -10); ctx.lineTo(0, 7); ctx.moveTo(-7, -4); ctx.lineTo(7, -4); ctx.stroke();
@@ -234,7 +258,7 @@
   function drawWeaponArm(ctx, o, atk, t) {
     const cls = o.cls;
     const sx = 6, sy = -27; // shoulder
-    const melee = cls === 'fighter' || cls === 'rogue';
+    const melee = cls === 'fighter' || cls === 'rogue' || cls === 'paladin';
     const rest = melee ? 1.25 : 0.5;
     let ang = rest + Math.sin(t * 3) * 0.05; // radians, 0 = pointing forward
     if (o.moving && !o.air) ang = rest + 0.1 + Math.sin(t * 14) * 0.35;
@@ -251,6 +275,14 @@
       ctx.beginPath(); ctx.moveTo(-3, -4); ctx.lineTo(-3, -34); ctx.lineTo(0, -40); ctx.lineTo(3, -34); ctx.lineTo(3, -4); ctx.closePath(); ctx.fill(); ctx.stroke();
       ctx.fillStyle = '#f2c94c'; rr(ctx, -8, -5, 16, 4, 2); ctx.fill(); ctx.stroke();
       ctx.fillStyle = '#7a4b2a'; ctx.fillRect(-1.5, -1, 3, 8);
+    } else if (cls === 'paladin') { // mace — lowered forward at rest so the head doesn't cover the face
+      ctx.rotate(-Math.PI / 2 + 0.2 + (atk >= 0 ? 0 : 2.0));
+      ctx.fillStyle = '#8a5a2b'; ctx.strokeStyle = OUTLINE; ctx.lineWidth = 1.4;
+      rr(ctx, -2, -24, 4, 30, 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#ffd34d';
+      for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3; ctx.beginPath(); ctx.moveTo(Math.cos(a) * 6, -30 + Math.sin(a) * 6); ctx.lineTo(Math.cos(a) * 12, -30 + Math.sin(a) * 12); ctx.lineTo(Math.cos(a + 0.5) * 6, -30 + Math.sin(a + 0.5) * 6); ctx.fill(); }
+      ell(ctx, 0, -30, 8, 8, '#f2c94c', OUTLINE, 1.5);
+      ell(ctx, -2.5, -32.5, 2.2, 2.2, 'rgba(255,255,255,0.8)');
     } else if (cls === 'rogue') {
       ctx.rotate(-Math.PI / 2 + 0.3);
       ctx.fillStyle = '#dfe6ee'; ctx.strokeStyle = OUTLINE; ctx.lineWidth = 1.4;
@@ -303,6 +335,7 @@
     rr(ctx, 9, -42 + c, 7, 14, 3); ctx.fill(); ctx.stroke();
     ell(ctx, 0, -50, 20, 19, o.cls === 'rogue' ? '#34314d' : o.hair, OUTLINE, 1.8);
     if (o.cls === 'mage') { ctx.fillStyle = '#6b47c0'; ctx.beginPath(); ctx.moveTo(-15, -62); ctx.lineTo(-3, -100); ctx.lineTo(15, -62); ctx.fill(); ctx.stroke(); }
+    if (o.cls === 'paladin') { ctx.fillStyle = '#f2c94c'; ctx.beginPath(); ctx.arc(0, -53, 22, Math.PI, Math.PI * 2); ctx.fill(); ctx.stroke(); }
     if (o.cls === 'fighter') { ctx.fillStyle = '#c9d4e6'; ctx.beginPath(); ctx.arc(0, -53, 22, Math.PI, Math.PI * 2); ctx.fill(); ctx.stroke(); }
   }
 

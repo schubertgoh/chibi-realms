@@ -99,7 +99,7 @@
       speed: st.speed, jump: st.jump, hp: info.maxHp, maxHp: info.maxHp, dead: false, atkAt: -1, atkSlot: 0, stealth: false };
     updateStatsHud();
     drawPortrait();
-    addChat(null, 'Welcome to Chibi Realms! Arrows/WASD move, Space jumps, Z X C V use skills, Enter to chat.');
+    addChat(null, 'Welcome to Wild Realms! Arrows/WASD move, Space jumps, Z X C V use skills, Enter to chat.');
   }
 
   // ------------------------------------------------------------------ input
@@ -136,7 +136,7 @@
     me.atkAt = now; me.atkSlot = slot;
     // movement-type skills are applied locally right away
     if (me.cls === 'rogue' && slot === 2) { me.kbx = me.facing * 820; me.rollUntil = now + 380; }
-    if (me.cls === 'marksman' && slot === 3) { me.kbx = -me.facing * 700; me.vy = -560; me.onGround = false; me.climb = null; }
+    if (me.cls === 'marksman' && slot === 2) { me.kbx = -me.facing * 700; me.vy = -560; me.onGround = false; me.climb = null; }
     if (me.cls === 'rogue' && slot === 1) me.stealthLocal = now + 5000;
     sendState(true);
     socket.emit('ability', { slot });
@@ -239,7 +239,7 @@
       if (p.id === selfId) {
         if (me) {
           const wasDead = me.dead;
-          me.hp = p.hp; me.maxHp = p.mhp; me.dead = !!p.d; me.stealth = !!p.st; me.iw = !!p.iw; me.inv = !!p.inv; me.level = p.l;
+          me.hp = p.hp; me.maxHp = p.mhp; me.dead = !!p.d; me.stealth = !!p.st; me.iw = !!p.iw; me.inv = !!p.inv; me.da = !!p.da; me.gs = !!p.gs; me.level = p.l;
           if (me.dead && !wasDead) { deadSince = now; el['death-overlay'].classList.remove('hidden'); }
           if (!me.dead && wasDead) el['death-overlay'].classList.add('hidden');
           const st = S.playerStats(me.cls, p.l);
@@ -302,6 +302,8 @@
       case 'heal': effects.push({ ...fx, born: now, dur: 700 }); burst(fx.x, fx.y - 30, 18, ['#8af59a', '#d4ffd9'], 150, { up: 160, g: -60, shape: 'plus', size: 6, life: 0.9 }); break;
       case 'smoke': burst(fx.x, fx.y - 30, 20, ['#6b5d8f', '#9a8cc2', '#3a3355'], 140, { g: -40, size: 9, life: 0.7 }); break;
       case 'dust': burst(fx.x, fx.y - 4, 12, ['#e8dcc4', '#ffffff'], 140, { g: -20, size: 7, life: 0.5 }); break;
+      case 'smite': effects.push({ ...fx, born: now, dur: 500 }); shake = Math.max(shake, 7); burst(fx.x, fx.y - 30, 18, ['#fff6c8', '#ffd34d', '#ffffff'], 300, { g: 200, shape: 'star', size: 5 }); break;
+      case 'knives': effects.push({ ...fx, born: now, dur: 420 }); shake = Math.max(shake, 5); burst(fx.x, fx.y, 12, ['#dfe6ee', '#d6455f'], 260, { g: 0, size: 3 }); break;
       case 'burst': effects.push({ ...fx, born: now, dur: 350 }); burst(fx.x, fx.y, 14, ['#ffffff', '#c9f0ff'], 300, { g: 0 }); break;
       case 'summon': burst(fx.x, fx.y, 26, ['#9ef2a8', '#ffffff', '#5fe07a'], 200, { g: -30, shape: 'star', size: 4 }); break;
       case 'spirit': effects.push({ ...fx, born: now, dur: 220 }); burst(fx.x2, fx.y2, 6, ['#9ef2a8', '#fff'], 160, { g: 0, size: 3 }); break;
@@ -428,12 +430,14 @@
     const rolling = isMe && p.rollUntil && now < p.rollUntil;
     if (rolling) { ctx.translate(0, -26); ctx.rotate(((now - (p.rollUntil - 380)) / 380) * Math.PI * 2 * p.facing); ctx.translate(0, 26); }
     R.drawChibi(ctx, { cls, hair: isMe ? p.hair : p.h, facing: isMe ? p.facing : p.f, t: now / 1000, moving, air, climbing, atk, atkSlot: isMe ? p.atkSlot : p.sl, seed: p.seed || 0 });
-    if (isMe ? p.iw : p.iw) {
+    if (p.iw) {
       ctx.globalAlpha = 0.35 + Math.sin(now / 120) * 0.1;
       R.ell(ctx, 0, -32, 34, 40, null, '#ffd34d', 3);
       ctx.fillStyle = 'rgba(255,220,120,0.15)'; ctx.fill();
     }
     ctx.restore();
+    if (p.da) drawDivineAura(x, y, now);
+    if (p.gs) drawGuardianSpirits(x, y, now);
     // hp bar for players (allies see each other)
     const hp = p.hp, mhp = isMe ? p.maxHp : p.mhp;
     if (hp < mhp) drawBar(x, y - 84, 40, hp / mhp, '#ff5e7a');
@@ -502,8 +506,73 @@
     ctx.fillStyle = '#3a2a4a'; ctx.fillText(t, x, y - 6);
   }
 
+  function drawDivineAura(x, y, now) {
+    ctx.save();
+    ctx.translate(x, y);
+    const pulse = (now % 500) / 500;
+    ctx.globalAlpha = 0.55 * (1 - pulse);
+    ctx.strokeStyle = '#ffe27a'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.ellipse(0, -2, 40 + pulse * 190, 10 + pulse * 30, 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.globalAlpha = 0.5;
+    const g = ctx.createLinearGradient(0, -90, 0, 0);
+    g.addColorStop(0, 'rgba(255,240,170,0)'); g.addColorStop(1, 'rgba(255,230,120,0.45)');
+    ctx.fillStyle = g; ctx.fillRect(-26, -90, 52, 90);
+    ctx.globalAlpha = 0.9;
+    for (let i = 0; i < 4; i++) {
+      const t = ((now / 900) + i / 4) % 1;
+      R.drawStar(ctx, Math.sin(i * 2.4 + now / 400) * 22, -t * 90, 3.5 * (1 - t) + 1, '#fff3b0');
+    }
+    ctx.restore();
+  }
+
+  function drawGuardianSpirits(x, y, now) {
+    ctx.save();
+    ctx.translate(x, y - 32);
+    ctx.globalAlpha = 0.25;
+    ctx.strokeStyle = '#ffe9a0'; ctx.lineWidth = 2; ctx.setLineDash([6, 10]); ctx.lineDashOffset = -now / 30;
+    ctx.beginPath(); ctx.ellipse(0, 0, 160, 70, 0, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+    for (let i = 0; i < 3; i++) {
+      const a = now / 260 + (i * Math.PI * 2) / 3;
+      const sx = Math.cos(a) * 95, sy = Math.sin(a) * 38;
+      ctx.globalAlpha = 0.35;
+      const g = ctx.createRadialGradient(sx, sy, 2, sx, sy, 22);
+      g.addColorStop(0, 'rgba(255,250,210,0.9)'); g.addColorStop(1, 'rgba(255,230,140,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(sx, sy, 22, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 0.95;
+      // tiny winged spirit
+      R.ell(ctx, sx - 7, sy - 2, 6, 3.5, '#ffffff');
+      R.ell(ctx, sx + 7, sy - 2, 6, 3.5, '#ffffff');
+      R.ell(ctx, sx, sy, 6, 6, '#fff6d0', '#e0a82e', 1.2);
+      R.ell(ctx, sx, sy - 9, 5, 1.6, null, '#ffd34d', 1.5);
+      R.ell(ctx, sx - 2, sy - 1, 0.9, 1.3, '#5a3a22'); R.ell(ctx, sx + 2, sy - 1, 0.9, 1.3, '#5a3a22');
+    }
+    ctx.restore();
+  }
+
+  function drawMagicShield(z, now) {
+    ctx.save();
+    ctx.translate(z.x, z.y);
+    const g = ctx.createRadialGradient(0, -40, 10, 0, -30, z.r);
+    g.addColorStop(0, 'rgba(210,190,255,0.12)'); g.addColorStop(0.8, 'rgba(160,130,255,0.22)'); g.addColorStop(1, 'rgba(200,180,255,0.55)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.ellipse(0, 0, z.r, z.r * 1.05, 0, Math.PI, 0); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(235,225,255,0.9)'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.ellipse(0, 0, z.r, z.r * 1.05, 0, Math.PI, 0); ctx.stroke();
+    // hex shimmer
+    ctx.globalAlpha = 0.35 + Math.sin(now / 200) * 0.15;
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.2;
+    for (let i = 1; i < 5; i++) {
+      ctx.beginPath(); ctx.ellipse(0, 0, z.r * (i / 5), z.r * 1.05, 0, Math.PI, 0); ctx.stroke();
+    }
+    ctx.globalAlpha = 0.8;
+    ctx.fillStyle = 'rgba(200,180,255,0.6)';
+    ctx.beginPath(); ctx.ellipse(0, 0, z.r, 10, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
   function drawZones(now) {
     for (const z of zones) {
+      if (z.t === 'shield') { drawMagicShield(z, now); continue; }
       ctx.save();
       ctx.translate(z.x, z.y);
       const g = ctx.createRadialGradient(0, -20, 10, 0, -20, z.r);
@@ -539,6 +608,7 @@
       } else {
         ctx.rotate(ang);
         const pierce = p.t === 'pierce';
+        if (pierce && p.r) ctx.scale(p.r / 16, p.r / 16);
         if (pierce) {
           const g = ctx.createLinearGradient(-50, 0, 10, 0);
           g.addColorStop(0, 'rgba(120,200,255,0)'); g.addColorStop(1, 'rgba(160,220,255,0.8)');
@@ -563,15 +633,15 @@
       ctx.save();
       switch (e.t) {
         case 'slash': {
-          const rogue = e.c === 'rogue';
+          const rogue = e.c === 'rogue', paladin = e.c === 'paladin';
           ctx.translate(e.x + e.f * (rogue ? 26 : 34), e.y - 34);
           ctx.scale(e.f, 1);
-          const r = rogue ? (e.big ? 48 : 34) : 52;
+          const r = rogue ? (e.big ? 48 : 34) : paladin && e.big ? 62 : 52;
           ctx.globalAlpha = 1 - k;
-          ctx.strokeStyle = rogue ? (e.big ? '#ff5e7a' : '#ffd1dc') : '#ffffff';
-          ctx.lineWidth = rogue ? 5 : 9; ctx.lineCap = 'round';
+          ctx.strokeStyle = rogue ? (e.big ? '#ff5e7a' : '#ffd1dc') : paladin ? '#fff6c8' : '#ffffff';
+          ctx.lineWidth = rogue ? 5 : paladin && e.big ? 13 : 9; ctx.lineCap = 'round';
           ctx.beginPath(); ctx.arc(0, 0, r, -1.6 + k * 0.6, 0.9 + k * 0.6); ctx.stroke();
-          ctx.strokeStyle = rogue ? '#d6455f' : '#9ad7ff'; ctx.lineWidth = 3;
+          ctx.strokeStyle = rogue ? '#d6455f' : paladin ? '#ffc93c' : '#9ad7ff'; ctx.lineWidth = 3;
           ctx.beginPath(); ctx.arc(0, 0, r - 7, -1.4 + k * 0.6, 0.8 + k * 0.6); ctx.stroke();
           break;
         }
@@ -624,6 +694,37 @@
           ctx.globalAlpha = 1 - k; ctx.strokeStyle = '#8af59a'; ctx.lineWidth = 4;
           ctx.beginPath(); ctx.ellipse(e.x, e.y - 4, e.r * k, e.r * k * 0.25, 0, 0, Math.PI * 2); ctx.stroke();
           ctx.fillStyle = 'rgba(140,245,154,0.15)'; ctx.fill(); break;
+        case 'smite': {
+          // golden pillar of light crashing down on the target
+          ctx.globalAlpha = k < 0.3 ? 1 : (1 - k) / 0.7;
+          const w2 = 34 * (1 - k * 0.6);
+          const g = ctx.createLinearGradient(0, e.y - 260, 0, e.y);
+          g.addColorStop(0, 'rgba(255,240,170,0)'); g.addColorStop(0.6, 'rgba(255,230,120,0.7)'); g.addColorStop(1, 'rgba(255,255,230,0.95)');
+          ctx.fillStyle = g; ctx.fillRect(e.x - w2 / 2, e.y - 260, w2, 260);
+          ctx.strokeStyle = '#ffd34d'; ctx.lineWidth = 4;
+          ctx.beginPath(); ctx.ellipse(e.x, e.y, 20 + k * 70, 6 + k * 14, 0, 0, Math.PI * 2); ctx.stroke();
+          break;
+        }
+        case 'knives': {
+          const ease = 1 - (1 - k) * (1 - k);
+          ctx.globalAlpha = k < 0.75 ? 1 : (1 - k) / 0.25;
+          ctx.strokeStyle = 'rgba(214,69,95,0.5)'; ctx.lineWidth = 3;
+          ctx.beginPath(); ctx.arc(e.x, e.y, 20 + ease * e.r * 0.9, 0, Math.PI * 2); ctx.stroke();
+          for (let j = 0; j < 14; j++) {
+            const a = (j / 14) * Math.PI * 2;
+            const d = 18 + ease * e.r;
+            ctx.save();
+            ctx.translate(e.x + Math.cos(a) * d, e.y + Math.sin(a) * d * 0.75);
+            ctx.rotate(a);
+            ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(-26, 0); ctx.lineTo(-8, 0); ctx.stroke();
+            ctx.fillStyle = '#e6edf5'; ctx.strokeStyle = '#3a2a2a'; ctx.lineWidth = 1.2;
+            ctx.beginPath(); ctx.moveTo(10, 0); ctx.lineTo(-2, -3); ctx.lineTo(-2, 3); ctx.closePath(); ctx.fill(); ctx.stroke();
+            ctx.fillStyle = '#d6455f'; ctx.fillRect(-8, -2, 6, 4);
+            ctx.restore();
+          }
+          break;
+        }
         case 'burst':
           ctx.globalAlpha = 1 - k; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 5;
           ctx.beginPath(); ctx.arc(e.x, e.y, 20 + k * 110, 0, Math.PI * 2); ctx.stroke(); break;
@@ -715,7 +816,7 @@
       } else cdEl.style.display = 'none';
     }
     if (me.dead) {
-      const wait = Math.max(0, 3000 - (now - deadSince));
+      const wait = Math.max(0, S.RESPAWN_SECONDS * 1000 - (now - deadSince));
       el['respawn-btn'].disabled = wait > 0;
       el['respawn-timer'].textContent = wait > 0 ? `Respawn in ${Math.ceil(wait / 1000)}…` : 'Ready to respawn';
     }

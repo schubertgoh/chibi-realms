@@ -1,4 +1,4 @@
-# Chibi Realms
+# Wild Realms
 
 A cute chibi fantasy 2D platformer in the browser. Up to **10 heroes at a time** share one map,
 hunting monsters that spawn on their own. Everyone who helps take down a monster earns score and XP
@@ -45,11 +45,12 @@ plan, attach a disk mounted at `/var/data`, and set the `DATA_DIR=/var/data` env
 | Tab | Show or hide the online list |
 
 **Classes**
-- **Fighter**: Slash, Shield Bash (stun), Whirlwind (area attack), Iron Wall (−60% damage taken). Most HP and armor.
-- **Mage**: Fireball (explodes), Lightning Bolt (chains to 3 enemies), Frost Nova (freeze), Slow Field (blizzard zone). Low HP.
-- **Rogue**: Backstab (×3.5 from stealth, ×1.5 from behind), Stealth (untouchable for 5s), Dodge Roll (invulnerable), Shadow Step (teleport behind a foe). Fastest class.
-- **Marksman**: Arrow, Multishot (5-arrow fan), Piercing Shot, Disengage (leap back and knock enemies away).
+- **Fighter**: Slash, Shield Bash (stun), Whirlwind (area attack), Iron Will (10s of −60% damage taken plus 10% HP regen). Most HP and armor.
+- **Mage**: Fireball (explodes), Lightning Bolt (chains to 3 enemies), Frost Nova (freeze), Magic Shield (4s dome; you and allies inside are invulnerable). Low HP.
+- **Rogue**: Backstab (always crits from behind or from stealth; ×3.5 from stealth, ×1.5 from behind), Stealth (untouchable for 5s), Dodge Roll (invulnerable), Fan of Knives (hits all nearby foes, then 1.5s invulnerable; 16s cooldown). Fastest class.
+- **Marksman**: Arrow, Multishot (5-arrow fan), Disengage (leap back and knock enemies away), Piercing Shot (huge, wide arrow that pierces everything).
 - **Druid**: Thorn Seed (slows), Entangle (roots enemies in place), Rejuvenate (heals allies in range), Nature Spirit (a fox ally that fights for 15s).
+- **Paladin**: Holy Strike (single-target mace swing), Divine Aura (5s of healing pulses on you and nearby allies), Righteous Blow (heavy hit that stuns one foe for 2s), Guardian Spirits (6s holy aura that damages nearby foes). Golden armor, sturdy and supportive.
 
 **Scoring**: when a monster dies, its score and XP are split among everyone who damaged it, by their
 share of the damage. Crowd control (stun, freeze, root, slow) adds bonus credit. The last hit counts

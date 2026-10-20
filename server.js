@@ -120,4 +120,4 @@ function shutdown() {
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 
-server.listen(PORT, () => console.log(`Chibi Realms running at http://localhost:${PORT}`));
+server.listen(PORT, () => console.log(`Wild Realms running at http://localhost:${PORT}`));

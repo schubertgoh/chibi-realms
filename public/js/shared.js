@@ -3,6 +3,7 @@
   const MAX_PLAYERS = 10;
   const MAX_CHARACTERS_PER_ACCOUNT = 5;
   const MAX_LEVEL = 50;
+  const RESPAWN_SECONDS = 10;
 
   const WORLD = { w: 3200, h: 1400, gravity: 2000 };
   const SPAWN = { x: 1600, y: 1200 };
@@ -38,7 +39,7 @@
         { name: 'Slash', icon: '⚔️', cd: 0.45, desc: 'Swing your sword in front of you.' },
         { name: 'Shield Bash', icon: '🛡️', cd: 5, desc: 'Bash and stun enemies in front.' },
         { name: 'Whirlwind', icon: '🌀', cd: 8, desc: 'Spin and hit everything around you.' },
-        { name: 'Iron Wall', icon: '🏰', cd: 15, desc: 'Take 60% less damage for 5s.' },
+        { name: 'Iron Will', icon: '🏰', cd: 22, desc: 'For 10s take 60% less damage and regenerate 10% of your HP.' },
       ],
     },
     mage: {
@@ -48,17 +49,17 @@
         { name: 'Fireball', icon: '🔥', cd: 0.7, desc: 'Hurl an exploding ball of fire.' },
         { name: 'Lightning Bolt', icon: '⚡', cd: 4, desc: 'Chain lightning through up to 3 foes.' },
         { name: 'Frost Nova', icon: '❄️', cd: 10, desc: 'Freeze nearby enemies solid.' },
-        { name: 'Slow Field', icon: '🌨️', cd: 12, desc: 'Conjure a blizzard that slows foes.' },
+        { name: 'Magic Shield', icon: '🔮', cd: 24, desc: 'Raise a 4s dome — you and allies inside are invulnerable.' },
       ],
     },
     rogue: {
       name: 'Rogue', color: '#d65a7a', hp: 120, armor: 0.05, speed: 330, jump: 980,
       desc: 'Lightning-fast shadow. Stealth, dodge and devastating backstabs.',
       skills: [
-        { name: 'Backstab', icon: '🗡️', cd: 0.3, desc: 'Quick stab. Huge damage from stealth or behind.' },
+        { name: 'Backstab', icon: '🗡️', cd: 0.3, desc: 'Quick stab. Always crits from behind or from stealth (huge damage from stealth).' },
         { name: 'Stealth', icon: '👤', cd: 10, desc: 'Vanish for 5s — monsters cannot hurt you.' },
         { name: 'Dodge Roll', icon: '💨', cd: 3, desc: 'Roll forward, invulnerable.' },
-        { name: 'Shadow Step', icon: '🌑', cd: 8, desc: 'Teleport behind the nearest foe.' },
+        { name: 'Fan of Knives', icon: '🔪', cd: 16, desc: 'Blast knives at all nearby foes, then become invulnerable for 1.5s.' },
       ],
     },
     marksman: {
@@ -67,8 +68,8 @@
       skills: [
         { name: 'Arrow', icon: '🏹', cd: 0.4, desc: 'Fire a swift arrow.' },
         { name: 'Multishot', icon: '🎯', cd: 5, desc: 'Fire a fan of five arrows.' },
-        { name: 'Piercing Shot', icon: '💥', cd: 7, desc: 'A powerful arrow that pierces all foes.' },
         { name: 'Disengage', icon: '🦘', cd: 6, desc: 'Leap back and knock enemies away.' },
+        { name: 'Piercing Shot', icon: '💥', cd: 12, desc: 'A huge piercing arrow that tears through every foe in its wide path.' },
       ],
     },
     druid: {
@@ -79,6 +80,16 @@
         { name: 'Entangle', icon: '🌿', cd: 8, desc: 'Roots burst out and hold enemies in place.' },
         { name: 'Rejuvenate', icon: '💚', cd: 6, desc: 'Heal yourself and nearby allies.' },
         { name: 'Nature Spirit', icon: '🦊', cd: 18, desc: 'Summon a spirit fox to fight for 15s.' },
+      ],
+    },
+    paladin: {
+      name: 'Paladin', color: '#e0a82e', hp: 190, armor: 0.2, speed: 235, jump: 900,
+      desc: 'Holy warrior in golden armor. Protects allies and smites the wicked with mace and shield.',
+      skills: [
+        { name: 'Holy Strike', icon: '🔨', cd: 0.5, desc: 'Swing your mace at a single target.' },
+        { name: 'Divine Aura', icon: '✨', cd: 14, desc: 'For 5s, heal yourself and nearby allies (30% HP total).' },
+        { name: 'Righteous Blow', icon: '⚜️', cd: 9, desc: 'A mighty strike that stuns one foe for 2s.' },
+        { name: 'Guardian Spirits', icon: '👼', cd: 18, desc: 'For 6s, holy spirits swirl around you, damaging nearby foes.' },
       ],
     },
   };
@@ -111,7 +122,7 @@
   }
 
   const Shared = {
-    MAX_PLAYERS, MAX_CHARACTERS_PER_ACCOUNT, MAX_LEVEL, WORLD, SPAWN, PLATFORMS, LADDERS,
+    MAX_PLAYERS, MAX_CHARACTERS_PER_ACCOUNT, MAX_LEVEL, RESPAWN_SECONDS, WORLD, SPAWN, PLATFORMS, LADDERS,
     HAIR_COLORS, CLASSES, MONSTERS, xpForLevel, levelFromXp, playerStats,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = Shared;

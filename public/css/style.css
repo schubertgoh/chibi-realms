@@ -128,7 +128,7 @@ input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(255, 138,
 .sk-icon { font-size: 20px; }
 kbd { font-family: inherit; font-weight: 700; background: #3a2a4a; color: #fff; border-radius: 6px; padding: 2px 7px; font-size: 12px; }
 .field-label { font-weight: 600; margin: 6px 0 8px; }
-.class-picker { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-bottom: 14px; }
+.class-picker { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; margin-bottom: 14px; }
 .class-card {
   font-family: inherit; font-weight: 600; font-size: 14px; color: var(--ink);
   display: flex; flex-direction: column; align-items: center; gap: 2px;
@@ -167,7 +167,7 @@ kbd { font-family: inherit; font-weight: 700; background: #3a2a4a; color: #fff; 
 .online-row .muted { color: rgba(255,255,255,0.6); }
 .online-row .score { color: var(--gold); }
 
-.skillbar { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; }
+.skillbar { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; gap: 18px; }
 .skill {
   position: relative; width: 66px; height: 66px; border-radius: 16px; cursor: pointer;
   background: linear-gradient(#5a4380, #3a2a5a); border: 3px solid #ffd34d;
@@ -177,7 +177,7 @@ kbd { font-family: inherit; font-weight: 700; background: #3a2a4a; color: #fff; 
 @keyframes press { 50% { transform: scale(0.9); } }
 .skill-icon { font-size: 30px; filter: drop-shadow(0 2px 0 rgba(0,0,0,0.3)); }
 .skill-key { position: absolute; top: -9px; left: -9px; background: #ffd34d; color: #3a2a4a; font-weight: 700; font-size: 12px; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
-.skill-name { position: absolute; bottom: -17px; left: 50%; transform: translateX(-50%); font-size: 11px; white-space: nowrap; text-shadow: 0 1px 2px #000; }
+.skill-name { position: absolute; bottom: -17px; left: 50%; transform: translateX(-50%); font-size: 10px; white-space: nowrap; text-shadow: 0 1px 2px #000; }
 .skill-cd { position: absolute; inset: 0; border-radius: 13px; display: none; align-items: center; justify-content: center; font-size: 22px; font-weight: 700; text-shadow: 0 2px 2px #000; }
 .controls-hint { position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%); font-size: 11px; opacity: 0.8; text-shadow: 0 1px 2px #000; white-space: nowrap; pointer-events: none !important; }
 
