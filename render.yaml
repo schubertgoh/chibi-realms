@@ -1,0 +1,17 @@
+# Render Blueprint: https://render.com/docs/blueprint-spec
+# In Render: New + -> Blueprint -> pick this repo.
+services:
+  - type: web
+    name: chibi-realms
+    runtime: node
+    plan: free
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /api/leaderboard
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      # Free instances have no persistent disk, so accounts reset when the service restarts or redeploys.
+      # To keep data: switch to a paid plan, add a disk mounted at /var/data, and uncomment below.
+      # - key: DATA_DIR
+      #   value: /var/data

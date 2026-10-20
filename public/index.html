@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chibi Realms</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <canvas id="menu-bg"></canvas>
+
+  <!-- ============ AUTH ============ -->
+  <section id="screen-auth" class="screen">
+    <div class="card auth-card">
+      <h1 class="logo">Chibi <span>Realms</span></h1>
+      <p class="tagline">Team up, hunt monsters, climb the leaderboard!</p>
+      <div class="tabs">
+        <button class="tab active" data-tab="login">Log In</button>
+        <button class="tab" data-tab="register">Create Account</button>
+      </div>
+      <form id="auth-form" autocomplete="on">
+        <label>Username<input id="auth-user" name="username" autocomplete="username" maxlength="16" required></label>
+        <label>Password<input id="auth-pass" name="password" type="password" autocomplete="current-password" maxlength="64" required></label>
+        <div id="auth-error" class="error"></div>
+        <button class="btn primary big" id="auth-submit" type="submit">Log In</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- ============ CHARACTER SELECT ============ -->
+  <section id="screen-chars" class="screen hidden">
+    <div class="topbar">
+      <h1 class="logo small">Chibi <span>Realms</span></h1>
+      <div class="topbar-right">
+        <span id="account-name" class="pill"></span>
+        <button class="btn ghost" id="logout-btn">Log out</button>
+      </div>
+    </div>
+    <div class="chars-layout">
+      <div class="card">
+        <div class="card-head">
+          <h2>Your Heroes</h2>
+          <button class="btn primary" id="new-char-btn">+ New Hero</button>
+        </div>
+        <div id="char-error" class="error"></div>
+        <div id="char-list" class="char-list"></div>
+      </div>
+      <div class="side-col">
+        <div class="card">
+          <h2>🏆 Hall of Fame</h2>
+          <div id="leaderboard" class="leaderboard"></div>
+        </div>
+        <div class="card">
+          <h2>🌿 In the Realm <span id="online-count" class="pill"></span></h2>
+          <div id="online-now" class="online-now"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ CHARACTER CREATE ============ -->
+  <section id="screen-create" class="screen hidden">
+    <div class="card create-card">
+      <div class="card-head">
+        <h2>Create a Hero</h2>
+        <button class="btn ghost" id="create-back">← Back</button>
+      </div>
+      <div class="create-layout">
+        <div class="preview-box">
+          <canvas id="create-preview" width="220" height="220"></canvas>
+          <div id="class-desc" class="class-desc"></div>
+          <ul id="class-skills" class="class-skills"></ul>
+        </div>
+        <form id="create-form">
+          <label>Hero name<input id="create-name" maxlength="12" placeholder="2-12 letters or numbers" required></label>
+          <div class="field-label">Class</div>
+          <div id="class-picker" class="class-picker"></div>
+          <div class="field-label">Hair color</div>
+          <div id="hair-picker" class="hair-picker"></div>
+          <div id="create-error" class="error"></div>
+          <button class="btn primary big" type="submit">Create Hero</button>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ GAME ============ -->
+  <section id="screen-game" class="screen hidden">
+    <canvas id="game-canvas"></canvas>
+    <div id="hud">
+      <div class="hud-panel hud-me">
+        <canvas id="hud-portrait" width="64" height="72"></canvas>
+        <div class="hud-me-info">
+          <div class="hud-name-row"><b id="hud-name"></b><span id="hud-level"></span></div>
+          <div class="bar hp"><div id="hp-fill"></div><span id="hp-text"></span></div>
+          <div class="bar xp"><div id="xp-fill"></div><span id="xp-text"></span></div>
+        </div>
+      </div>
+
+      <div class="hud-panel hud-stats">
+        <div><small>Score</small><b id="stat-score">0</b></div>
+        <div><small>Kills</small><b id="stat-kills">0</b></div>
+        <div><small>Assists</small><b id="stat-assists">0</b></div>
+        <div><small>Heroes</small><b id="stat-online">0/10</b></div>
+      </div>
+
+      <div id="online-panel" class="hud-panel online-panel">
+        <div class="online-title">Heroes online <small>(Tab)</small></div>
+        <div id="online-list"></div>
+      </div>
+
+      <div id="boss-timer" class="boss-timer"></div>
+      <div id="banner" class="banner"></div>
+      <div id="toasts" class="toasts"></div>
+
+      <div id="skillbar" class="skillbar"></div>
+      <div class="controls-hint">←→ / A D move · Space jump · ↑↓ ladders · ↓+Space drop · Z X C V skills · Enter chat</div>
+
+      <div id="chat-panel" class="hud-panel chat">
+        <button id="chat-toggle" class="chat-toggle" type="button" title="Show/hide chat">
+          <span>💬 Chat</span><span id="chat-unread" class="chat-unread hidden"></span><span id="chat-arrow" class="chat-arrow">▾</span>
+        </button>
+        <div id="chat-log" class="chat-log"></div>
+        <input id="chat-input" maxlength="120" placeholder="Press Enter to chat…" autocomplete="off">
+      </div>
+
+      <button class="btn ghost leave-btn" id="leave-btn">⟵ Leave</button>
+
+      <div id="death-overlay" class="death-overlay hidden">
+        <div class="card">
+          <h2>You were defeated!</h2>
+          <p id="respawn-timer"></p>
+          <button class="btn primary big" id="respawn-btn" disabled>Respawn</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div id="modal" class="modal hidden"><div class="card"><p id="modal-text"></p><div class="modal-actions" id="modal-actions"></div></div></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="js/shared.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
