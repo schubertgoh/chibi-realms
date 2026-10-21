@@ -569,9 +569,9 @@ class Game {
       for (const p of this.players.values()) {
         if (p.dead || Math.abs(p.x - pot.x) > 26 || Math.abs(p.y - pot.y) > 40) continue;
         if (pot.kind === 'hp') {
-          const amt = Math.min(p.maxHp - p.hp, pot.amount);
+          const amt = Math.round(Math.min(p.maxHp - p.hp, pot.amount));
           p.hp += amt;
-          this.addFx({ t: 'dmg', x: p.x, y: p.y - 70, v: amt, k: 'h' });
+          if (amt > 0) this.addFx({ t: 'dmg', x: p.x, y: p.y - 70, v: amt, k: 'h' });
         } else {
           p.res = Math.min(p.resMax, p.res + pot.amount);
           this.addFx({ t: 'dmg', x: p.x, y: p.y - 70, v: pot.amount, k: 'r' });
@@ -660,7 +660,7 @@ class Game {
         h.f = sign(target.x - h.x);
         this.addFx({ t: 'bite', x: target.x, y: target.y - target.h / 2 });
         const dealt = this.damageMonster(target, 14, o);
-        const heal = Math.min(o.maxHp - o.hp, Math.round(dealt * 0.3));
+        const heal = Math.round(Math.min(o.maxHp - o.hp, dealt * 0.3));
         if (heal > 0) { o.hp += heal; this.addFx({ t: 'dmg', x: o.x, y: o.y - 70, v: heal, k: 'h' }); }
       }
     }
@@ -725,11 +725,11 @@ class Game {
       }
       if (!ally) { p.fairyAt = now + 1000; continue; } // nothing to do — check again shortly
       p.fairyAt = now + 6000;
-      const amt = Math.min(ally.maxHp - ally.hp, Math.round(ally.maxHp * 0.12 + 5 * p.dmgMult));
+      const amt = Math.round(Math.min(ally.maxHp - ally.hp, ally.maxHp * 0.12 + 5 * p.dmgMult));
       ally.hp += amt;
       if (ally !== p) p.auraHealed += amt;
       this.addFx({ t: 'fairybolt', x1: p.x - p.facing * 26, y1: p.y - 76, x2: ally.x, y2: ally.y - 40, heal: 1 });
-      this.addFx({ t: 'dmg', x: ally.x, y: ally.y - 70, v: amt, k: 'h' });
+      if (amt > 0) this.addFx({ t: 'dmg', x: ally.x, y: ally.y - 70, v: amt, k: 'h' });
     }
   }
 
@@ -1062,7 +1062,7 @@ class Game {
     let healedOthers = 0;
     for (const o of this.players.values()) {
       if (o.dead || Math.hypot(o.x - cx, o.y - cy) > r) continue;
-      const amt = Math.min(o.maxHp - o.hp, Math.round(o.maxHp * frac + flat * healer.dmgMult));
+      const amt = Math.round(Math.min(o.maxHp - o.hp, o.maxHp * frac + flat * healer.dmgMult));
       if (amt <= 0) continue;
       o.hp += amt;
       this.addFx({ t: 'dmg', x: o.x, y: o.y - 70, v: amt, k: 'h' });

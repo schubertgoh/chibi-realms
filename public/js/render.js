@@ -989,7 +989,98 @@
     ell(ctx, x, y + 10 * s, 60 * s, 10 * s, '#e9f4ff');
   }
 
+  // ---------------------------------------------------------------- Wild Realms emblem
+  // A gold-rimmed shield framing a sunny sky, snowy peaks, rolling hills and a cute slime with a leaf sprout.
+  // Drawn in a 100x100 design space and scaled to `size` pixels; the background stays transparent.
+  function drawEmblem(ctx, size) {
+    ctx.save();
+    ctx.scale(size / 100, size / 100);
+    const shield = () => {
+      ctx.beginPath();
+      ctx.moveTo(50, 5);
+      ctx.bezierCurveTo(68, 5, 84, 8, 91, 13);
+      ctx.lineTo(91, 47);
+      ctx.bezierCurveTo(91, 71, 74, 87, 50, 96);
+      ctx.bezierCurveTo(26, 87, 9, 71, 9, 47);
+      ctx.lineTo(9, 13);
+      ctx.bezierCurveTo(16, 8, 32, 5, 50, 5);
+      ctx.closePath();
+    };
+    // soft drop shadow
+    ctx.save(); ctx.translate(0, 2.5); shield(); ctx.fillStyle = 'rgba(60,20,100,0.35)'; ctx.fill(); ctx.restore();
+    // scene, clipped to the shield
+    ctx.save();
+    shield(); ctx.clip();
+    const sky = ctx.createLinearGradient(0, 5, 0, 70);
+    sky.addColorStop(0, '#5fb6f2'); sky.addColorStop(1, '#d4f0ff');
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, 100, 100);
+    const sun = ctx.createRadialGradient(72, 24, 2, 72, 24, 18);
+    sun.addColorStop(0, 'rgba(255,250,210,1)'); sun.addColorStop(0.45, 'rgba(255,236,150,0.8)'); sun.addColorStop(1, 'rgba(255,236,150,0)');
+    ctx.fillStyle = sun; ctx.beginPath(); ctx.arc(72, 24, 18, 0, Math.PI * 2); ctx.fill();
+    // little cloud
+    ell(ctx, 28, 24, 8, 4.5, '#ffffff'); ell(ctx, 22, 26, 5.5, 3.5, '#ffffff'); ell(ctx, 34, 26, 6, 3.5, '#ffffff');
+    // snowy mountains
+    ctx.fillStyle = '#9bbfeb';
+    ctx.beginPath(); ctx.moveTo(-5, 62); ctx.lineTo(22, 34); ctx.lineTo(40, 52); ctx.lineTo(58, 30); ctx.lineTo(84, 56); ctx.lineTo(105, 44); ctx.lineTo(105, 70); ctx.lineTo(-5, 70); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.moveTo(58, 30); ctx.lineTo(52, 37); ctx.lineTo(56, 36); ctx.lineTo(58, 39); ctx.lineTo(61, 36); ctx.lineTo(64, 37); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(22, 34); ctx.lineTo(17, 40); ctx.lineTo(21, 39); ctx.lineTo(23, 41); ctx.lineTo(27, 39); ctx.closePath(); ctx.fill();
+    // rolling hills with round trees
+    ctx.fillStyle = '#8fd36b';
+    ctx.beginPath(); ctx.moveTo(-5, 66); ctx.quadraticCurveTo(25, 50, 50, 62); ctx.quadraticCurveTo(75, 52, 105, 64); ctx.lineTo(105, 100); ctx.lineTo(-5, 100); ctx.closePath(); ctx.fill();
+    for (const [tx, ty, ts] of [[20, 58, 1], [82, 58, 0.9], [70, 61, 0.7]]) {
+      ctx.fillStyle = '#6b8f4a'; ctx.fillRect(tx - 0.8 * ts, ty, 1.6 * ts, 6 * ts);
+      ell(ctx, tx, ty - 1, 4.5 * ts, 5.5 * ts, '#5fb04a');
+    }
+    ctx.fillStyle = '#6cc644';
+    ctx.beginPath(); ctx.moveTo(-5, 78); ctx.quadraticCurveTo(30, 68, 55, 76); ctx.quadraticCurveTo(80, 70, 105, 78); ctx.lineTo(105, 100); ctx.lineTo(-5, 100); ctx.closePath(); ctx.fill();
+    // flowers
+    for (const [fx, fy, c] of [[16, 82, '#ff7eb6'], [86, 80, '#ffd34d'], [26, 88, '#ffffff'], [76, 88, '#ff8a5c']]) {
+      for (let i = 0; i < 5; i++) { const a = i * Math.PI * 2 / 5; ell(ctx, fx + Math.cos(a) * 1.6, fy + Math.sin(a) * 1.6, 1.3, 1.3, c); }
+      ell(ctx, fx, fy, 1, 1, '#ffb84d');
+    }
+    ctx.restore();
+
+    // hero slime with a leaf sprout
+    ctx.save();
+    ctx.translate(50, 86);
+    ell(ctx, 0, 0.5, 17, 3, 'rgba(0,0,0,0.18)');
+    const w = 17, h = 26;
+    const body = ctx.createLinearGradient(0, -h, 0, 0);
+    body.addColorStop(0, '#a6ef7c'); body.addColorStop(1, '#4fae3e');
+    ctx.fillStyle = body; ctx.strokeStyle = '#2f6f2a'; ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.moveTo(-w, 0);
+    ctx.bezierCurveTo(-w * 1.05, -h * 0.75, -w * 0.45, -h, 0, -h);
+    ctx.bezierCurveTo(w * 0.45, -h, w * 1.05, -h * 0.75, w, 0);
+    ctx.quadraticCurveTo(0, 3, -w, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ell(ctx, -7, -19, 4, 2.6, 'rgba(255,255,255,0.7)');
+    // face
+    for (const ex of [-5.5, 5.5]) { ell(ctx, ex, -11, 2.4, 3.2, '#2a1e2a'); ell(ctx, ex + 0.8, -12.3, 0.9, 1.1, '#ffffff'); }
+    ell(ctx, -10, -7, 2.2, 1.3, 'rgba(255,120,140,0.55)'); ell(ctx, 10, -7, 2.2, 1.3, 'rgba(255,120,140,0.55)');
+    ctx.strokeStyle = '#5a2a2a'; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.arc(0, -7.5, 2.2, 0.15, Math.PI - 0.15); ctx.stroke();
+    // sprout
+    ctx.strokeStyle = '#3f8f3a'; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(0, -h + 0.5); ctx.quadraticCurveTo(1.5, -h - 4, 0, -h - 7); ctx.stroke(); ctx.lineCap = 'butt';
+    ctx.save(); ctx.translate(0, -h - 6.5);
+    ctx.save(); ctx.rotate(-0.5); ell(ctx, -4, 0, 4.5, 2.4, '#7fd36b', '#2f6f2a', 1); ctx.restore();
+    ctx.save(); ctx.rotate(0.45); ell(ctx, 4, -0.5, 4.5, 2.4, '#5fb85a', '#2f6f2a', 1); ctx.restore();
+    ctx.restore();
+    ctx.restore();
+
+    // rim: purple outer edge, gold band, light inner line
+    shield(); ctx.lineJoin = 'round';
+    ctx.strokeStyle = '#6b3fa0'; ctx.lineWidth = 8; ctx.stroke();
+    ctx.strokeStyle = '#ffd34d'; ctx.lineWidth = 4.5; ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,248,210,0.9)'; ctx.lineWidth = 1.2; ctx.stroke();
+    // gem at the top of the rim and sparkles
+    ell(ctx, 50, 5, 4.2, 4.2, '#e8505b', '#6b3fa0', 1.4);
+    ell(ctx, 48.8, 3.8, 1.2, 1.2, 'rgba(255,255,255,0.85)');
+    drawStar(ctx, 90, 9, 4, '#fff6c8'); drawStar(ctx, 11, 60, 2.6, '#fff6c8');
+    ctx.restore();
+  }
+
   window.Render = {
-    rr, ell, shade, drawStar, drawChibi, drawMonster, drawSpirit, drawTreeSpirit, drawTrap, drawWolf, drawScarab, drawPotion, buildTerrain, buildMountains, buildHills, drawCloud,
+    rr, ell, shade, drawStar, drawEmblem, drawChibi, drawMonster, drawSpirit, drawTreeSpirit, drawTrap, drawWolf, drawScarab, drawPotion, buildTerrain, buildMountains, buildHills, drawCloud,
   };
 })();

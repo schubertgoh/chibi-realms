@@ -1171,7 +1171,8 @@
       ctx.font = `800 ${size}px Fredoka, sans-serif`; ctx.textAlign = 'center';
       const colors = { m: ['#ffb03c', '#7a2a00'], c: ['#ff4d6d', '#5a0018'], p: ['#b48cff', '#2a1a4a'], h: ['#6ef08a', '#0d4a1c'], r: ['#7fb2ff', '#0d2a5a'], b: ['#ffe27a', '#7a4a00'], a: ['#ffffff', '#3a2a4a'] };
       const [fill, stroke] = colors[f.k] || colors.m;
-      const txt = (f.k === 'h' ? '+' : '') + f.v + (f.k === 'c' ? '!' : '');
+      const v = typeof f.v === 'number' ? Math.round(f.v) : f.v; // numbers always show as whole values
+      const txt = (f.k === 'h' ? '+' : '') + v + (f.k === 'c' ? '!' : '');
       ctx.lineWidth = 5; ctx.strokeStyle = stroke; ctx.lineJoin = 'round'; ctx.strokeText(txt, 0, 0);
       ctx.fillStyle = fill; ctx.fillText(txt, 0, 0);
       ctx.restore();
