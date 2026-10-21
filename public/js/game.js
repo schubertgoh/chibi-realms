@@ -48,6 +48,7 @@
     others.clear(); monsters.clear(); projectiles = []; zones = []; trees = []; traps = []; pets = []; hounds = []; scarabs = []; portals = [];
     cds.fill(0);
     farming = false;
+    keys.clear(); jumpQueued = false; portalQueued = false; // keys held when the last game ended (keyup was never seen)
     lastBuffKey = ''; el['hud-buffs'].innerHTML = '';
     particles.length = 0; floaters.length = 0; effects.length = 0; bubbles.clear();
     el['chat-log'].innerHTML = '';

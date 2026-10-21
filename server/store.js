@@ -46,6 +46,7 @@ db.exec(`
 `);
 
 const SESSION_TTL_MS = 30 * 24 * 3600 * 1000;
+const BOT_USER = 'ai-companions'; // system account that owns the AI companions' characters
 
 function hashPassword(password, salt) {
   return crypto.scryptSync(password, salt, 64).toString('hex');
@@ -69,7 +70,9 @@ const q = {
     boss_kills = ?, play_seconds = play_seconds + ?, last_played = ? WHERE id = ?`),
   rewardOffline: db.prepare(`UPDATE characters SET xp = xp + ?, score = score + ?, kills = kills + ?, assists = assists + ? WHERE id = ?`),
   fixLevel: db.prepare('UPDATE characters SET level = ? WHERE id = ?'),
+  // AI companions play whenever anyone is online, so they stay off the leaderboard
   leaderboard: db.prepare(`SELECT name, class, hair, level, score, kills, assists, boss_kills FROM characters
+    WHERE user_id NOT IN (SELECT id FROM users WHERE username = ?)
     ORDER BY score DESC, level DESC LIMIT ?`),
 };
 
@@ -124,12 +127,11 @@ module.exports = {
     const c = q.charById.get(charId);
     if (c) q.fixLevel.run(S.levelFromXp(c.xp), charId);
   },
-  leaderboard(limit = 15) { return q.leaderboard.all(limit); },
+  leaderboard(limit = 15) { return q.leaderboard.all(BOT_USER, limit); },
 
   // AI companions are characters owned by a system account nobody can log in to
   // (the username fails the sign-up check and the password is random). Progress persists like anyone else's.
   ensureBotCharacter(name, cls, hair) {
-    const BOT_USER = 'ai-companions';
     const u = q.userByName.get(BOT_USER) || this.createUser(BOT_USER, crypto.randomBytes(24).toString('hex'));
     for (let i = 0; i < 50; i++) {
       const n = i ? `${name}${i + 1}` : name;
