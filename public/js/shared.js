@@ -97,7 +97,7 @@
         { name: 'Holy Strike', icon: '🔨', cd: 0.5, desc: 'Mace hit on one target. Every 10s it becomes Divine Strike: triple damage and a stun.' },
         { name: 'Holy Auras', icon: '🛡️', cd: 3, desc: 'Always-on aura for you and nearby allies. Press to switch: Bulwark → Zephyr → Vitality → Vengeance.' },
         { name: 'Divine Bulwark', icon: '🔆', cd: 10, desc: 'A holy shield that completely blocks the next 2 hits.' },
-        { name: 'Righteous Cry', icon: '📣', cd: 8, desc: 'Taunt all nearby enemies to attack you for 4s.' },
+        { name: 'Righteous Cry', icon: '📣', cd: 8, desc: 'Taunt all nearby enemies to attack you for 4s. Taunted enemies deal 30% less damage.' },
         { name: 'Guardian Spirits', icon: '👼', cd: 18, desc: 'For 6s, holy spirits swirl around you, damaging nearby foes.' },
       ],
     },
@@ -182,7 +182,7 @@
   const COSTS = {
     fighter: [5, 20, 15, 25, 30],
     marksman: [5, 15, 15, 15, 30],
-    rogue: [0, 15, 0, 15, 35], // Backstab and Stealth are free
+    rogue: [0, 15, 0, 15, 40], // Backstab and Stealth are free
     mage: [1, 10, 15, 8, 25],
     druid: [1, 15, 12, 15, 25],
     paladin: [0, 0, 12, 10, 20], // Holy Strike and Holy Auras are free; Divine Strike costs DIVINE_STRIKE_COST
@@ -190,6 +190,7 @@
   };
   const ALT_COSTS = { beyonder: [0, 10, 15, 12] }; // Void Slash is free and restores mana
   const DIVINE_STRIKE_COST = 20;
+  const TAUNT_DAMAGE_MULT = 0.7; // Righteous Cry: taunted monsters deal 30% less damage
   const VOID_SLASH_RESTORE = 4;
   for (const [cls, list] of Object.entries(COSTS)) CLASSES[cls].skills.forEach((sk, i) => { sk.cost = list[i]; });
   for (const [cls, list] of Object.entries(ALT_COSTS)) CLASSES[cls].altSkills.forEach((sk, i) => { sk.cost = list[i]; });
@@ -198,7 +199,7 @@
   // Rogue: energy-limited, so its other skills come back much faster
   CLASSES.rogue.skills[1].cd = 1.2; // Knife Throw
   CLASSES.rogue.skills[3].cd = 1.5; // Dodge Roll
-  CLASSES.rogue.skills[4].cd = 8;   // Fan of Knives
+  CLASSES.rogue.skills[4].cd = 3;   // Fan of Knives
   CLASSES.paladin.skills[0].desc = 'Free mace hit on one target. Every 10s it becomes Divine Strike (triple damage + stun) if you have ' + DIVINE_STRIKE_COST + ' mana.';
   CLASSES.beyonder.altSkills[0].desc = 'Slash a single enemy in front with your hex sword. Each hit restores ' + VOID_SLASH_RESTORE + ' mana.';
 
@@ -256,7 +257,7 @@
   const Shared = {
     MAX_PLAYERS, MAX_CHARACTERS_PER_ACCOUNT, MAX_LEVEL, RESPAWN_SECONDS, WORLD, SPAWN, PLATFORMS, LADDERS,
     HAIR_COLORS, CLASSES, MONSTERS, SKILL_LABELS, AURAS, AURA_BITS, AURA_RADIUS, AURA_EFFECTS, EXPOSED_MULT, MAX_TRAPS, MAX_TREES, PASSIVE, MAX_SCARABS, skillDef, cdIndex, COOLDOWN_SLOTS,
-    RESOURCES, CLASS_RESOURCE, ENERGY_TICK, DIVINE_STRIKE_COST, VOID_SLASH_RESTORE, resourceStats, skillCost, POTIONS, xpForLevel, levelFromXp, playerStats,
+    RESOURCES, CLASS_RESOURCE, ENERGY_TICK, DIVINE_STRIKE_COST, TAUNT_DAMAGE_MULT, VOID_SLASH_RESTORE, resourceStats, skillCost, POTIONS, xpForLevel, levelFromXp, playerStats,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = Shared;
   else window.Shared = Shared;

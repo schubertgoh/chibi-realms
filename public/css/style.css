@@ -71,7 +71,9 @@ input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(255, 138,
   text-shadow: 0 5px 0 #6b3fa0, 0 9px 18px rgba(60, 20, 100, 0.35);
 }
 .logo span { color: var(--gold); }
-.logo.small { font-size: 30px; -webkit-text-stroke: 1.5px #6b3fa0; text-shadow: 0 3px 0 #6b3fa0; }
+.logo.small { font-size: 30px; -webkit-text-stroke: 1.5px #6b3fa0; text-shadow: 0 3px 0 #6b3fa0; display: flex; align-items: center; gap: 8px; }
+.logo-emblem { display: block; margin: -6px auto 2px; filter: drop-shadow(0 6px 10px rgba(60, 20, 100, 0.25)); }
+.logo-emblem.small { display: inline-block; margin: 0; filter: none; }
 
 /* ---------- auth ---------- */
 #screen-auth { display: flex; align-items: center; justify-content: center; padding: 16px; }

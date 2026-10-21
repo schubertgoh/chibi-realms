@@ -337,6 +337,24 @@
     menuAnim = ts;
   }
 
+  // Wild Realms emblem: crisp on high-DPI screens, and reused as the browser-tab icon
+  function drawEmblems() {
+    const dpr = Math.min(3, window.devicePixelRatio || 1);
+    for (const c of document.querySelectorAll('canvas.logo-emblem')) {
+      const size = Number(c.dataset.size) || 96;
+      c.width = c.height = Math.round(size * dpr);
+      c.style.width = c.style.height = size + 'px';
+      R.drawEmblem(c.getContext('2d'), c.width);
+    }
+    const fav = document.createElement('canvas');
+    fav.width = fav.height = 64;
+    R.drawEmblem(fav.getContext('2d'), 64);
+    let link = document.querySelector('link[rel="icon"]');
+    if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.head.appendChild(link); }
+    link.href = fav.toDataURL('image/png');
+  }
+  drawEmblems();
+
   // boot
   requestAnimationFrame(animatePreview);
   if (location.protocol === 'file:') {

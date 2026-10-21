@@ -310,6 +310,9 @@ class Bot {
     const ch = this.game.store.ensureBotCharacter(this.def.name, this.def.cls, this.def.hair);
     if (!ch) return false;
     const sid = 'bot:' + ch.id;
+    // orders and notes were for whoever was online last time, so start fresh
+    this.order = { mode: 'follow', player: null };
+    this.notes = [];
     const socket = { id: sid, data: {}, emit: (ev, d) => this.onEvent(ev, d), join() {}, leave() {}, disconnect() {} };
     this.p = this.game.addPlayer(socket, ch.user_id, ch, true);
     this.system = systemPrompt({ ...this.def, name: this.p.name }, this.p.cls);

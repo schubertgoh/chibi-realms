@@ -368,20 +368,22 @@ class Game {
 
       if (def.boss) this.updateBoss(m, dt, now);
 
+      // Righteous Cry weakens taunted monsters
+      const hit = Math.round(def.dmg * (now < m.tauntUntil ? S.TAUNT_DAMAGE_MULT : 1));
       // contact damage to players
       for (const p of this.players.values()) {
         if (p.dead) continue;
         if (Math.abs(p.x - m.x) < m.w / 2 + 12 && p.y > m.y - m.h - 10 && p.y - 50 < m.y) {
-          this.hurtPlayer(p, def.dmg, m.x, now);
+          this.hurtPlayer(p, hit, m.x, now);
         }
       }
       // contact damage to grown trees
       for (const t of this.trees) {
         if (now < t.growAt || now < t.hitAt) continue;
         if (Math.abs(t.x - m.x) < m.w / 2 + 18 && Math.abs(t.y - m.y) < 20) {
-          t.hp -= def.dmg;
+          t.hp -= hit;
           t.hitAt = now + 800;
-          this.addFx({ t: 'dmg', x: t.x, y: t.y - 90, v: def.dmg, k: 'p' });
+          this.addFx({ t: 'dmg', x: t.x, y: t.y - 90, v: hit, k: 'p' });
           if (t.hp <= 0) this.addFx({ t: 'treedeath', x: t.x, y: t.y });
         }
       }
@@ -389,9 +391,9 @@ class Game {
       for (const pet of this.pets.values()) {
         if (pet.dead || now < pet.hitAt) continue;
         if (Math.abs(pet.x - m.x) < m.w / 2 + 14 && Math.abs(pet.y - m.y) < 20) {
-          pet.hp -= def.dmg;
+          pet.hp -= hit;
           pet.hitAt = now + 800;
-          this.addFx({ t: 'dmg', x: pet.x, y: pet.y - 40, v: def.dmg, k: 'p' });
+          this.addFx({ t: 'dmg', x: pet.x, y: pet.y - 40, v: hit, k: 'p' });
           if (pet.hp <= 0) {
             pet.dead = true;
             pet.respawnAt = now + 30000;
@@ -404,7 +406,7 @@ class Game {
       for (const sc of this.scarabs) {
         if (sc.hp <= 0 || now < sc.hitAt) continue;
         if (Math.abs(sc.x - m.x) < m.w / 2 + 10 && Math.abs(sc.y - m.y) < 20) {
-          sc.hp -= def.dmg;
+          sc.hp -= hit;
           sc.hitAt = now + 800;
           if (sc.hp <= 0) this.addFx({ t: 'petdeath', x: sc.x, y: sc.y });
         }
@@ -420,7 +422,7 @@ class Game {
       m.stompT = rand(5, 7);
       this.addFx({ t: 'stomp', x: m.x, y: m.y });
       for (const p of this.players.values()) {
-        if (!p.dead && Math.abs(p.y - m.y) < 12 && Math.abs(p.x - m.x) < 460) this.hurtPlayer(p, 22, m.x, now, true);
+        if (!p.dead && Math.abs(p.y - m.y) < 12 && Math.abs(p.x - m.x) < 460) this.hurtPlayer(p, Math.round(22 * (now < m.tauntUntil ? S.TAUNT_DAMAGE_MULT : 1)), m.x, now, true);
       }
     }
     if (m.summonT <= 0) {
@@ -567,9 +569,9 @@ class Game {
       for (const p of this.players.values()) {
         if (p.dead || Math.abs(p.x - pot.x) > 26 || Math.abs(p.y - pot.y) > 40) continue;
         if (pot.kind === 'hp') {
-          const amt = Math.min(p.maxHp - p.hp, pot.amount);
+          const amt = Math.round(Math.min(p.maxHp - p.hp, pot.amount));
           p.hp += amt;
-          this.addFx({ t: 'dmg', x: p.x, y: p.y - 70, v: amt, k: 'h' });
+          if (amt > 0) this.addFx({ t: 'dmg', x: p.x, y: p.y - 70, v: amt, k: 'h' });
         } else {
           p.res = Math.min(p.resMax, p.res + pot.amount);
           this.addFx({ t: 'dmg', x: p.x, y: p.y - 70, v: pot.amount, k: 'r' });
@@ -658,7 +660,7 @@ class Game {
         h.f = sign(target.x - h.x);
         this.addFx({ t: 'bite', x: target.x, y: target.y - target.h / 2 });
         const dealt = this.damageMonster(target, 14, o);
-        const heal = Math.min(o.maxHp - o.hp, Math.round(dealt * 0.3));
+        const heal = Math.round(Math.min(o.maxHp - o.hp, dealt * 0.3));
         if (heal > 0) { o.hp += heal; this.addFx({ t: 'dmg', x: o.x, y: o.y - 70, v: heal, k: 'h' }); }
       }
     }
@@ -723,11 +725,11 @@ class Game {
       }
       if (!ally) { p.fairyAt = now + 1000; continue; } // nothing to do — check again shortly
       p.fairyAt = now + 6000;
-      const amt = Math.min(ally.maxHp - ally.hp, Math.round(ally.maxHp * 0.12 + 5 * p.dmgMult));
+      const amt = Math.round(Math.min(ally.maxHp - ally.hp, ally.maxHp * 0.12 + 5 * p.dmgMult));
       ally.hp += amt;
       if (ally !== p) p.auraHealed += amt;
       this.addFx({ t: 'fairybolt', x1: p.x - p.facing * 26, y1: p.y - 76, x2: ally.x, y2: ally.y - 40, heal: 1 });
-      this.addFx({ t: 'dmg', x: ally.x, y: ally.y - 70, v: amt, k: 'h' });
+      if (amt > 0) this.addFx({ t: 'dmg', x: ally.x, y: ally.y - 70, v: amt, k: 'h' });
     }
   }
 
@@ -1060,7 +1062,7 @@ class Game {
     let healedOthers = 0;
     for (const o of this.players.values()) {
       if (o.dead || Math.hypot(o.x - cx, o.y - cy) > r) continue;
-      const amt = Math.min(o.maxHp - o.hp, Math.round(o.maxHp * frac + flat * healer.dmgMult));
+      const amt = Math.round(Math.min(o.maxHp - o.hp, o.maxHp * frac + flat * healer.dmgMult));
       if (amt <= 0) continue;
       o.hp += amt;
       this.addFx({ t: 'dmg', x: o.x, y: o.y - 70, v: amt, k: 'h' });
