@@ -14,6 +14,10 @@ npm start
 Then open http://localhost:3000. To test multiplayer, open a second browser window (or another
 device on your network at `http://<your-ip>:3000`) and log in with a different character.
 
+While developing, use `npm run dev` instead. The server restarts when server code changes, open
+browsers reload when anything in `public/` changes (CSS updates in place without a reload), and if you
+were in game you land straight back in with the same hero.
+
 Requires Node.js 22.13+ (it uses the built-in `node:sqlite`, so there is nothing native to compile).
 
 ## AI companions

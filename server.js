@@ -23,6 +23,7 @@ const game = new Game(io, store);
 game.bots = new Bots(game);
 
 app.use(express.json({ limit: '10kb' }));
+if (process.argv.includes('--dev')) require('./server/dev')(app, io);
 // no-cache = browsers always revalidate, so after an update nobody runs a mix of old and new game scripts
 app.use(express.static(path.join(__dirname, 'public'), {
   setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache'),

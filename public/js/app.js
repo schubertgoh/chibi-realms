@@ -171,6 +171,12 @@
     }
     $('new-char-btn').disabled = account.characters.length >= account.maxCharacters;
     loadLeaderboard();
+    // npm run dev reloaded the page while you were playing: jump back in
+    if (sessionStorage.getItem('cr_dev_rejoin')) {
+      sessionStorage.removeItem('cr_dev_rejoin');
+      const c = account.characters.find((x) => String(x.id) === sessionStorage.getItem('cr_playing'));
+      if (c) enterGame(c);
+    }
   }
 
   async function loadLeaderboard() {
@@ -295,6 +301,7 @@
 
   // ------------------------------------------------ game
   function enterGame(c) {
+    sessionStorage.setItem('cr_playing', String(c.id)); // lets npm run dev put you back in game after a reload
     show('game');
     window.ChibiGame.start({
       token, character: c,
@@ -304,7 +311,7 @@
       },
     });
   }
-  $('leave-btn').addEventListener('click', () => window.ChibiGame.stop());
+  $('leave-btn').addEventListener('click', () => { sessionStorage.removeItem('cr_playing'); window.ChibiGame.stop(); });
   $('respawn-btn').addEventListener('click', () => window.ChibiGame.respawn());
 
   // ------------------------------------------------ menu background
