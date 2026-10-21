@@ -1,6 +1,6 @@
-// Background music: an original, cheerful town theme in the spirit of classic 2D MMO towns,
-// synthesized live with the Web Audio API (no audio files, no licensing questions).
-// Flute lead, marimba arpeggios, plucked bass, soft pad and light percussion, looping forever.
+// Background music: loops the track in public/audio (TRACK_URL below). If that file is missing or can't be
+// decoded, it falls back to an original town theme synthesized live with the Web Audio API
+// (flute lead, marimba arpeggios, plucked bass, soft pad and light percussion).
 // Also owns the shared audio graph (sound effects plug into it) and the volume / mute settings.
 (function () {
   const BPM = 112;
@@ -161,15 +161,41 @@
     }
   }
 
+  // Background track: an audio file that loops on the music bus. The synthesized theme above only plays
+  // if the file can't be loaded or decoded.
+  const TRACK_URL = 'audio/floral-life.mp3';
+  const TRACK_GAIN = 0.9; // relative to the music bus, so it sits under the sound effects
+  let track = null;    // 'loading' | AudioBufferSourceNode | 'failed'
+
+  function startTrack() {
+    if (track) return;
+    track = 'loading';
+    fetch(TRACK_URL)
+      .then((r) => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
+      .then((data) => ctx.decodeAudioData(data))
+      .then((buf) => {
+        const src = ctx.createBufferSource(), g = ctx.createGain();
+        src.buffer = buf;
+        src.loop = true;
+        g.gain.value = TRACK_GAIN;
+        src.connect(g).connect(master);
+        src.start();
+        track = src;
+      })
+      .catch(() => { // no file: fall back to the synthesized theme
+        track = 'failed';
+        if (playing && !timer) { step = 0; nextTime = ctx.currentTime + 0.1; timer = setInterval(schedule, 25); }
+      });
+  }
+
   function start() {
     if (playing) return;
     if (!ctx && !setup()) return;
     if (window.Sfx) window.Sfx.attach(ctx, sfx);
     playing = true;
-    step = 0;
-    nextTime = ctx.currentTime + 0.1;
-    ctx.resume();
-    timer = setInterval(schedule, 25);
+    ctx.resume(); // the track keeps its place while stopped and carries on from there
+    if (track === 'failed') { step = 0; nextTime = ctx.currentTime + 0.1; timer = setInterval(schedule, 25); }
+    else startTrack();
   }
 
   function stop() {

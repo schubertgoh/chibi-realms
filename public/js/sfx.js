@@ -178,7 +178,8 @@
     },
     // server fx events that deserve a sound
     impact(fx) {
-      const pos = { x: fx.x, y: fx.y };
+      // some effects (e.g. chain lightning) have no single position: play those unpanned at full volume
+      const pos = Number.isFinite(fx.x) && Number.isFinite(fx.y) ? { x: fx.x, y: fx.y } : null;
       switch (fx.t) {
         case 'dmg': if (fx.k === 'm') play('hit', pos); else if (fx.k === 'c') play('crit', pos); else if (fx.k === 'p') play('hurt', pos); break;
         case 'explode': case 'trapboom': play('boom', pos); break;

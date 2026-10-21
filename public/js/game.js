@@ -478,8 +478,8 @@
     lastFrame = ts;
     time += dt;
     if (farming) followServer(dt);
-    if (me) window.Sfx.listen(me.x, me.y);
     else { updateMe(dt, ts); sendState(false); }
+    if (me) window.Sfx.listen(me.x, me.y);
 
     const k = Math.min(1, dt * 14);
     for (const o of others.values()) { o.rx += (o.x - o.rx) * k; o.ry += (o.y - o.ry) * k; if (Math.abs(o.x - o.rx) > 300) { o.rx = o.x; o.ry = o.y; } }
@@ -1352,18 +1352,6 @@
       el['chat-log'].scrollTop = el['chat-log'].scrollHeight;
     }
   }
-  (function initMusicControls() {
-    const mute = document.getElementById('music-mute'), vol = document.getElementById('music-volume');
-    mute.addEventListener('click', () => { window.Music.toggleMute(); mute.blur(); });
-    vol.addEventListener('input', () => window.Music.setVolume(vol.value / 100));
-    vol.addEventListener('change', () => vol.blur()); // give the arrow keys back to the game
-    window.Music.onChange((s) => {
-      mute.textContent = s.muted || s.volume === 0 ? '🔇' : '🔊';
-      mute.title = s.muted ? 'Unmute sound (M)' : 'Mute sound (M)';
-      vol.value = Math.round(s.volume * 100);
-    });
-  })();
-
   (function initChatToggle() {
     const btn = document.getElementById('chat-toggle');
     btn.addEventListener('mousedown', (e) => e.preventDefault()); // keep focus off the button so Space still jumps
