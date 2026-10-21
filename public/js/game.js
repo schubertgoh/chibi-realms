@@ -478,8 +478,8 @@
     lastFrame = ts;
     time += dt;
     if (farming) followServer(dt);
-    if (me) window.Sfx.listen(me.x, me.y);
     else { updateMe(dt, ts); sendState(false); }
+    if (me) window.Sfx.listen(me.x, me.y);
 
     const k = Math.min(1, dt * 14);
     for (const o of others.values()) { o.rx += (o.x - o.rx) * k; o.ry += (o.y - o.ry) * k; if (Math.abs(o.x - o.rx) > 300) { o.rx = o.x; o.ry = o.y; } }
