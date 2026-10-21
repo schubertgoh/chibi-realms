@@ -5,6 +5,8 @@ services:
     name: chibi-realms
     runtime: node
     plan: free
+    # Deploys are triggered by .github/workflows/deploy.yml, not by Render watching the repo.
+    autoDeploy: false
     buildCommand: npm ci
     startCommand: npm start
     healthCheckPath: /api/leaderboard
