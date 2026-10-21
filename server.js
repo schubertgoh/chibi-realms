@@ -15,7 +15,10 @@ const io = new Server(server);
 const game = new Game(io, store);
 
 app.use(express.json({ limit: '10kb' }));
-app.use(express.static(path.join(__dirname, 'public')));
+// no-cache = browsers always revalidate, so after an update nobody runs a mix of old and new game scripts
+app.use(express.static(path.join(__dirname, 'public'), {
+  setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache'),
+}));
 
 // --- tiny in-memory rate limiter for auth endpoints ---
 const attempts = new Map();

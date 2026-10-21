@@ -241,13 +241,26 @@
     $('class-desc').append(title, p, st);
     const ul = $('class-skills');
     ul.innerHTML = '';
-    c.skills.forEach((sk, i) => {
+    if (c.passive) {
       const li = document.createElement('li');
-      li.innerHTML = `<kbd>${['Z', 'X', 'C', 'V'][i]}</kbd><span class="sk-icon"></span><div><b></b><small></small></div>`;
+      li.className = 'passive-line';
+      li.innerHTML = '<kbd>P</kbd><span class="sk-icon"></span><div><b></b><small></small></div>';
+      li.querySelector('.sk-icon').textContent = c.passive.icon;
+      li.querySelector('b').textContent = `${c.passive.name} · passive`;
+      li.querySelector('small').textContent = c.passive.desc;
+      ul.appendChild(li);
+    }
+    const addSkill = (sk, key, tag) => {
+      const li = document.createElement('li');
+      li.innerHTML = `<kbd>${key}</kbd><span class="sk-icon"></span><div><b></b><small></small></div>`;
       li.querySelector('.sk-icon').textContent = sk.icon;
-      li.querySelector('b').textContent = `${sk.name} · ${sk.cd}s`;
+      li.querySelector('b').textContent = `${sk.name} · ${sk.cd}s${tag ? ' · ' + tag : ''}`;
       li.querySelector('small').textContent = sk.desc;
       ul.appendChild(li);
+    };
+    c.skills.forEach((sk, i) => {
+      addSkill(sk, S.SKILL_LABELS[i], c.altSkills && c.altSkills[i] ? 'rod' : '');
+      if (c.altSkills && c.altSkills[i]) addSkill(c.altSkills[i], S.SKILL_LABELS[i], 'sword');
     });
   }
 
