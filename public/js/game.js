@@ -100,6 +100,7 @@
       const now = performance.now();
       cds[i] = now + ms;
       me.atkAt = now; me.atkSlot = slot;
+      window.Sfx.cast(me.cls, me.form, slot);
       const b = el.skillbar.children[slot];
       if (b) { b.classList.remove('pressed'); void b.offsetWidth; b.classList.add('pressed'); }
     });
@@ -131,7 +132,7 @@
       speed: st.speed, jump: st.jump, hp: info.maxHp, maxHp: info.maxHp, dead: false, atkAt: -1, atkSlot: 0, stealth: false };
     updateStatsHud();
     drawPortrait();
-    addChat(null, 'Welcome to Wild Realms! Arrow keys move, Space jumps, A Z X C V use skills, Enter to chat, M mutes music. Type /farm in chat to auto farm.');
+    addChat(null, 'Welcome to Wild Realms! Arrow keys move, Space jumps, A Z X C V use skills, Enter to chat, M mutes sound. Type /farm in chat to auto farm.');
   }
 
   // ------------------------------------------------------------------ input
@@ -191,6 +192,7 @@
     const cost = portalSecond ? 0 : S.skillCost(me.cls, me.form, slot);
     if ((me.rs ?? 0) < cost) { toast(`Not enough ${S.RESOURCES[S.CLASSES[me.cls].resource].name.toLowerCase()}!`); return; }
     me.rs -= cost;
+    window.Sfx.cast(me.cls, me.form, slot);
     cds[idx] = now + cooldownMs(slot);
     me.atkAt = now; me.atkSlot = slot;
     // movement-type skills are applied locally right away
@@ -375,7 +377,7 @@
       }
       let o = others.get(p.id);
       if (!o) { o = { ...p, rx: p.x, ry: p.y, atkAt: -1, seed: Math.random() * 10 }; others.set(p.id, o); }
-      if (o.as !== p.as) { o.atkAt = now; }
+      if (o.as !== p.as) { o.atkAt = now; window.Sfx.cast(p.c, p.fm ? 'sword' : 'rod', p.sl, p); }
       Object.assign(o, p);
     }
     for (const id of others.keys()) if (!seen.has(id)) others.delete(id);
@@ -398,7 +400,7 @@
     scarabs = s.sc || [];
     portals = s.po || [];
     potions = s.pot || [];
-    for (const fx of s.fx) spawnFx(fx, now);
+    for (const fx of s.fx) { spawnFx(fx, now); window.Sfx.impact(fx); }
     updateOnlineList(s.p);
   }
 
@@ -476,6 +478,7 @@
     lastFrame = ts;
     time += dt;
     if (farming) followServer(dt);
+    if (me) window.Sfx.listen(me.x, me.y);
     else { updateMe(dt, ts); sendState(false); }
 
     const k = Math.min(1, dt * 14);
@@ -1356,7 +1359,7 @@
     vol.addEventListener('change', () => vol.blur()); // give the arrow keys back to the game
     window.Music.onChange((s) => {
       mute.textContent = s.muted || s.volume === 0 ? '🔇' : '🔊';
-      mute.title = s.muted ? 'Unmute music (M)' : 'Mute music (M)';
+      mute.title = s.muted ? 'Unmute sound (M)' : 'Mute sound (M)';
       vol.value = Math.round(s.volume * 100);
     });
   })();

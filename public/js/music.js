@@ -1,6 +1,7 @@
 // Background music: an original, cheerful town theme in the spirit of classic 2D MMO towns,
 // synthesized live with the Web Audio API (no audio files, no licensing questions).
 // Flute lead, marimba arpeggios, plucked bass, soft pad and light percussion, looping forever.
+// Also owns the shared audio graph (sound effects plug into it) and the volume / mute settings.
 (function () {
   const BPM = 112;
   const EIGHTH = 60 / BPM / 2;
@@ -30,24 +31,30 @@
     return [root, root + 7, root + 12, root + 12 + third, root + 19, root + 24, root + 24 + third];
   };
 
-  let ctx = null, master = null, wet = null, noise = null;
+  let ctx = null, out = null, master = null, sfx = null, wet = null, noise = null;
   let timer = null, playing = false, nextTime = 0, step = 0;
   let settings = { volume: 0.5, muted: false };
   try { Object.assign(settings, JSON.parse(localStorage.getItem(STORE_KEY)) || {}); } catch (_) { /* ignore */ }
   const listeners = [];
 
   function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(settings)); } catch (_) { /* ignore */ } }
-  function level() { return settings.muted ? 0 : settings.volume * 0.35; }
-  function applyVolume() { if (master) master.gain.setTargetAtTime(level(), ctx.currentTime, 0.05); }
+  function level() { return settings.muted ? 0 : settings.volume; }
+  function applyVolume() { if (out) out.gain.setTargetAtTime(level(), ctx.currentTime, 0.05); }
   function notify() { for (const fn of listeners) fn(settings); }
 
   function setup() {
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return false;
     ctx = new AC();
-    master = ctx.createGain();
-    master.gain.value = level();
-    master.connect(ctx.destination);
+    out = ctx.createGain(); // player volume, shared by music and effects
+    out.gain.value = level();
+    out.connect(ctx.destination);
+    master = ctx.createGain(); // music bus
+    master.gain.value = 0.35;
+    master.connect(out);
+    sfx = ctx.createGain(); // sound effects bus
+    sfx.gain.value = 0.6;
+    sfx.connect(out);
     // small hall reverb from a decaying noise impulse
     const len = ctx.sampleRate * 1.8, ir = ctx.createBuffer(2, len, ctx.sampleRate);
     for (let c = 0; c < 2; c++) {
@@ -157,6 +164,7 @@
   function start() {
     if (playing) return;
     if (!ctx && !setup()) return;
+    if (window.Sfx) window.Sfx.attach(ctx, sfx);
     playing = true;
     step = 0;
     nextTime = ctx.currentTime + 0.1;
