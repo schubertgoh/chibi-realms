@@ -62,6 +62,7 @@ const q = {
   charCount: db.prepare('SELECT COUNT(*) AS n FROM characters WHERE user_id = ?'),
   charById: db.prepare('SELECT * FROM characters WHERE id = ?'),
   charByName: db.prepare('SELECT id FROM characters WHERE name = ?'),
+  charRowByName: db.prepare('SELECT * FROM characters WHERE name = ?'),
   insertChar: db.prepare('INSERT INTO characters (user_id, name, class, hair, created_at) VALUES (?, ?, ?, ?, ?)'),
   deleteChar: db.prepare('DELETE FROM characters WHERE id = ? AND user_id = ?'),
   saveChar: db.prepare(`UPDATE characters SET level = ?, xp = ?, score = ?, kills = ?, assists = ?, deaths = ?,
@@ -124,4 +125,18 @@ module.exports = {
     if (c) q.fixLevel.run(S.levelFromXp(c.xp), charId);
   },
   leaderboard(limit = 15) { return q.leaderboard.all(limit); },
+
+  // AI companions are characters owned by a system account nobody can log in to
+  // (the username fails the sign-up check and the password is random). Progress persists like anyone else's.
+  ensureBotCharacter(name, cls, hair) {
+    const BOT_USER = 'ai-companions';
+    const u = q.userByName.get(BOT_USER) || this.createUser(BOT_USER, crypto.randomBytes(24).toString('hex'));
+    for (let i = 0; i < 50; i++) {
+      const n = i ? `${name}${i + 1}` : name;
+      const row = q.charRowByName.get(n);
+      if (!row) return this.createCharacter(u.id, n, cls, hair);
+      if (row.user_id === u.id && row.class === cls) return row;
+    }
+    return null;
+  },
 };

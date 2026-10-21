@@ -16,6 +16,44 @@ device on your network at `http://<your-ip>:3000`) and log in with a different c
 
 Requires Node.js 22.13+ (it uses the built-in `node:sqlite`, so there is nothing native to compile).
 
+## AI companions
+
+Whenever at least one real player is online, two AI heroes join the realm: **Pip** (a cheerful Druid
+healer) and **Brakka** (a gruff Fighter). They move around, climb ladders, fight monsters with their
+class skills, heal and protect you, and chat. They're marked with 🤖, and they leave when the last
+real player does. They also give up their slot if the realm fills up.
+
+**Talk to them in chat** by mentioning a name, or use `@all` / `everyone` for both:
+
+- `Pip, stay with me and heal me`
+- `Brakka go hunt monsters and tell me how many kills you get`
+- `@all the King Slime is up, let's go!`
+- `Brakka use Whirlwind` · `Pip go to the top platform on the right` · `everyone fall back`
+
+Each companion has two layers:
+
+- **Autopilot** (`server/bots.js`). It runs every server tick. It handles movement physics, finds its
+  way between floors, aims, and runs a skill rotation for its class. It follows the current order:
+  follow, protect, hunt, boss, goto, hold or retreat.
+- **Claude agent loop**. A ping in chat wakes the companion up. It reads a briefing (recent chat, its
+  own state, allies, nearby monsters, the boss) and acts through tools: `say`, `set_order`,
+  `use_skill`, `look`, `wait` and `remember`. It can loop a few times, for example to wait, check
+  progress and report back. Big moments trigger short unprompted reactions too: the boss appearing, a
+  companion being knocked out, or a level-up.
+
+To turn on the agent loop, put a key in a `.env` file next to `server.js` (it's git-ignored):
+
+```bash
+ANTHROPIC_API_KEY=sk-ant-...      # Claude API directly (default model claude-opus-5-5)
+# or
+OPENCODE_API_KEY=oc_sk_...        # Claude via OpenCode's Anthropic-compatible endpoint (default model claude-haiku-5-5)
+```
+
+Optional settings: `AI_MODEL` (model ID), `AI_EFFORT` (`low` by default, for snappy replies),
+`AI_PLAYERS=off` (no companions), and `AI_AGENT=off` (companions on autopilot only). With no key, the
+companions still play and understand plain commands: follow, protect, hunt, boss, hold, retreat, or a
+skill name.
+
 ## Deploy online (Render)
 
 The game needs a running Node server for logins, the database and real-time play, so it can't be
@@ -80,6 +118,7 @@ The **King Slime** boss shows up every few minutes, with HP that scales with the
 server.js            Express REST API (register/login/characters/leaderboard) + Socket.io
 server/store.js      SQLite database (data/game.db): users, sessions, characters
 server/game.js       Server-side simulation: monsters, abilities, damage, rewards, 10-player cap
+server/bots.js       AI companions: autopilot (movement, navigation, skill rotation) + Claude agent loop
 public/index.html    Login, character select and create screens, plus the game HUD
 public/js/shared.js  Map, classes, monsters and the XP curve (used by both server and client)
 public/js/render.js  Procedurally drawn chibi characters, monsters and world art

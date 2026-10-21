@@ -1,9 +1,16 @@
 const path = require('path');
+const fs = require('fs');
 const http = require('http');
+
+// Optional .env next to this file (API keys for the AI companions); real environment variables win.
+const ENV_FILE = path.join(__dirname, '.env');
+if (fs.existsSync(ENV_FILE)) process.loadEnvFile(ENV_FILE);
+
 const express = require('express');
 const { Server } = require('socket.io');
 const store = require('./server/store');
 const Game = require('./server/game');
+const Bots = require('./server/bots');
 const S = require('./public/js/shared.js');
 
 const PORT = Number(process.env.PORT) || 3000;
@@ -13,6 +20,7 @@ app.set('trust proxy', 1);
 const server = http.createServer(app);
 const io = new Server(server);
 const game = new Game(io, store);
+game.bots = new Bots(game);
 
 app.use(express.json({ limit: '10kb' }));
 // no-cache = browsers always revalidate, so after an update nobody runs a mix of old and new game scripts

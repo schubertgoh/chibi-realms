@@ -51,40 +51,15 @@ class Game {
     });
     socket.on('ability', (d) => {
       const p = socket.data.player;
-      if (!p || p.dead || !d) return;
-      const slot = d.slot;
-      if (!SKILL_SLOTS.includes(slot)) return;
-      const now = Date.now();
-      const key = S.cdIndex(p.cls, p.form, slot);
-      if (now < p.cds[key] - 120) return; // small latency slack
-      // opening the second Void Portal is free (the cost was paid when placing the first)
-      const portalSecond = p.cls === 'beyonder' && p.form === 'rod' && slot === 3 && p.portalPending && now <= p.portalPending.until;
-      const cost = portalSecond ? 0 : S.skillCost(p.cls, p.form, slot);
-      if (p.res < cost) { p.socket.emit('noResource', { slot, type: p.resType }); return; }
-      p.res -= cost;
-      p.cds[key] = now + this.cooldownMs(p, slot);
-      p.atkSeq++;
-      p.atkSlot = slot;
-      this.cast(p, slot, now, d);
+      if (p && d) this.useAbility(p, d);
     });
     socket.on('chat', (text) => {
       const p = socket.data.player;
-      if (!p || typeof text !== 'string') return;
-      const now = Date.now();
-      if (now - p.lastChat < 600) return;
-      p.lastChat = now;
-      const clean = text.replace(/\s+/g, ' ').trim().slice(0, 120);
-      if (clean) this.io.emit('chat', { id: p.sid, n: p.name, text: clean });
+      if (p) this.playerChat(p, text);
     });
     socket.on('respawn', () => {
       const p = socket.data.player;
-      if (!p || !p.dead || Date.now() - p.deadAt < RESPAWN_DELAY_MS) return;
-      p.dead = false;
-      p.hp = p.maxHp;
-      p.x = S.SPAWN.x + rand(-80, 80);
-      p.y = S.SPAWN.y;
-      p.invulnUntil = Date.now() + 2000;
-      socket.emit('teleport', { x: p.x, y: p.y, f: p.facing });
+      if (p) this.respawnPlayer(p);
     });
     socket.on('disconnect', () => {
       const p = socket.data.player;
@@ -109,14 +84,26 @@ class Game {
         other.socket.disconnect(true);
       }
     }
+    // AI companions give up their slot to a real player
+    if (this.players.size >= S.MAX_PLAYERS && this.bots) this.bots.makeRoom();
     if (this.players.size >= S.MAX_PLAYERS)
       return socket.emit('joinError', `The realm is full (${S.MAX_PLAYERS}/${S.MAX_PLAYERS} heroes). Try again soon!`);
 
+    const p = this.addPlayer(socket, user.id, ch);
+    socket.data.player = p;
+    socket.join('game');
+    socket.emit('joined', { id: socket.id, x: p.x, y: p.y, me: this.selfInfo(p) });
+    this.sys(`${p.name} the ${S.CLASSES[p.cls].name} joined the realm!`);
+    if (this.bots) this.bots.onHumanJoin(p);
+  }
+
+  // Creates and registers a player. `socket` is a Socket.io socket, or a stand-in object for AI companions.
+  addPlayer(socket, userId, ch, isBot = false) {
     const level = S.levelFromXp(ch.xp);
     const stats = S.playerStats(ch.class, level);
     const now = Date.now();
     const p = {
-      sid: socket.id, socket, userId: user.id, charId: ch.id, name: ch.name, cls: ch.class, hair: ch.hair,
+      sid: socket.id, socket, userId, charId: ch.id, name: ch.name, cls: ch.class, hair: ch.hair, isBot,
       level, xp: ch.xp, score: ch.score, kills: ch.kills, assists: ch.assists, deaths: ch.deaths, bossKills: ch.boss_kills,
       maxHp: stats.maxHp, hp: stats.maxHp, dmgMult: stats.dmgMult, armor: stats.armor,
       ...(() => { const r = S.resourceStats(ch.class, level); return { resType: r.type, resMax: r.max, res: r.max, resRegen: r.regen, energyAt: now + S.ENERGY_TICK.everyMs }; })(),
@@ -134,11 +121,55 @@ class Game {
     };
     if (this.players.size === 0 && this.nextBossAt < now) this.nextBossAt = now + 90 * 1000;
     this.players.set(socket.id, p);
-    socket.data.player = p;
-    socket.join('game');
     if (p.cls === 'marksman') this.pets.set(p.sid, this.makePet(p));
-    socket.emit('joined', { id: socket.id, x: p.x, y: p.y, me: this.selfInfo(p) });
-    this.sys(`${p.name} the ${S.CLASSES[p.cls].name} joined the realm!`);
+    return p;
+  }
+
+  humanCount() {
+    let n = 0;
+    for (const p of this.players.values()) if (!p.isBot) n++;
+    return n;
+  }
+
+  // Returns true if the skill was cast.
+  useAbility(p, d) {
+    if (p.dead) return false;
+    const slot = d.slot;
+    if (!SKILL_SLOTS.includes(slot)) return false;
+    const now = Date.now();
+    const key = S.cdIndex(p.cls, p.form, slot);
+    if (now < p.cds[key] - 120) return false; // small latency slack
+    // opening the second Void Portal is free (the cost was paid when placing the first)
+    const portalSecond = p.cls === 'beyonder' && p.form === 'rod' && slot === 3 && p.portalPending && now <= p.portalPending.until;
+    const cost = portalSecond ? 0 : S.skillCost(p.cls, p.form, slot);
+    if (p.res < cost) { p.socket.emit('noResource', { slot, type: p.resType }); return false; }
+    p.res -= cost;
+    p.cds[key] = now + this.cooldownMs(p, slot);
+    p.atkSeq++;
+    p.atkSlot = slot;
+    this.cast(p, slot, now, d);
+    return true;
+  }
+
+  playerChat(p, text) {
+    if (typeof text !== 'string') return;
+    const now = Date.now();
+    if (now - p.lastChat < 600) return;
+    p.lastChat = now;
+    const clean = text.replace(/\s+/g, ' ').trim().slice(0, 120);
+    if (!clean) return;
+    this.io.emit('chat', { id: p.sid, n: p.name, text: clean });
+    if (this.bots) this.bots.onChat(p, clean);
+  }
+
+  respawnPlayer(p) {
+    if (!p.dead || Date.now() - p.deadAt < RESPAWN_DELAY_MS) return;
+    p.dead = false;
+    p.hp = p.maxHp;
+    p.x = S.SPAWN.x + rand(-80, 80);
+    p.y = S.SPAWN.y;
+    p.invulnUntil = Date.now() + 2000;
+    p.socket.emit('teleport', { x: p.x, y: p.y, f: p.facing });
   }
 
   removePlayer(p) {
@@ -152,6 +183,8 @@ class Game {
     this.scarabs = this.scarabs.filter((sc) => sc.owner !== p.sid);
     this.portals = this.portals.filter((po) => po.owner !== p.sid);
     for (const m of this.monsters.values()) if (m.target === 'p:' + p.sid) m.target = null;
+    // companions only play while a real player is online
+    if (!p.isBot && this.bots && this.humanCount() === 0) this.bots.despawnAll();
   }
 
   isCharacterOnline(charId) {
@@ -187,7 +220,10 @@ class Game {
   }
   saveAll() { for (const p of this.players.values()) this.savePlayer(p); }
 
-  sys(text) { this.io.emit('sys', text); }
+  sys(text) {
+    this.io.emit('sys', text);
+    if (this.bots) this.bots.onSys(text);
+  }
   addFx(fx) { this.fx.push(fx); }
 
   cooldownMs(p, slot) {
@@ -1169,6 +1205,7 @@ class Game {
       this.io.emit('banner', { text: 'The King Slime has appeared!', kind: 'boss' });
     }
 
+    if (this.bots) this.bots.update(dt, now);
     this.updateAuras(now);
     for (const m of [...this.monsters.values()]) this.updateMonster(m, dt, now);
     this.updateDots(now);
@@ -1257,7 +1294,7 @@ class Game {
         fu: now < p.furyUntil ? 1 : 0, hs: now < p.hasteUntil ? 1 : 0, ivc: now < p.invincibleUntil ? 1 : 0,
         fm: p.form === 'sword' ? 1 : 0, hx: now < p.hexUntil ? 1 : 0,
         ...this.passiveState(p, now),
-        d: p.dead ? 1 : 0, as: p.atkSeq, sl: p.atkSlot,
+        d: p.dead ? 1 : 0, as: p.atkSeq, sl: p.atkSlot, ai: p.isBot ? 1 : 0,
       })),
       hd: this.hounds.map((h) => ({ id: h.id, x: Math.round(h.x), y: Math.round(h.y), f: h.f, mv: h.moving ? 1 : 0 })),
       sc: this.scarabs.map((sc) => ({ id: sc.id, x: Math.round(sc.x), y: sc.y, f: sc.f, mv: sc.moving ? 1 : 0, hp: sc.hp, mhp: sc.maxHp })),

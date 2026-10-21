@@ -493,7 +493,7 @@
     drawEffects(now);
     drawParticles();
     for (const m of monsters.values()) drawMonsterBar(m);
-    for (const o of others.values()) drawNameTag(o.rx, o.ry, `Lv.${o.l} ${o.n}`, o.d, false, o.id);
+    for (const o of others.values()) drawNameTag(o.rx, o.ry, `${o.ai ? '🤖 ' : ''}Lv.${o.l} ${o.n}`, o.d, false, o.id);
     if (me && myInfo) drawNameTag(me.x, me.y, `Lv.${myInfo.level} ${myInfo.name}`, me.dead, true, selfId);
     for (const t of trees) if (t.g >= 1 && t.hp < t.mhp) drawBar(t.x, t.y - 118, 46, t.hp / t.mhp, '#6ee07a');
     for (const pt of pets) if (!pt.d && pt.hp < pt.mhp) drawBar(pt.x, pt.y - 50, 34, pt.hp / pt.mhp, '#ffb03c');
@@ -1274,7 +1274,8 @@
       const row = document.createElement('div');
       row.className = 'online-row' + (p.id === selfId ? ' me' : '');
       const name = document.createElement('span');
-      name.textContent = `${S.CLASSES[p.c].skills[0].icon} ${p.n}`;
+      name.textContent = `${S.CLASSES[p.c].skills[0].icon} ${p.n}${p.ai ? ' 🤖' : ''}`;
+      if (p.ai) name.title = 'AI companion: mention its name in chat to give it orders';
       const lv = document.createElement('span'); lv.className = 'muted'; lv.textContent = `Lv.${p.l}`;
       const sc = document.createElement('span'); sc.className = 'score'; sc.textContent = p.sc.toLocaleString();
       row.append(name, lv, sc);
