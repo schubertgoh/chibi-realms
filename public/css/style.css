@@ -112,6 +112,8 @@ input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(255, 138,
 .bar.xp > div { background: linear-gradient(#ffe27a, #f2b31c); }
 .bar.hp > div { background: linear-gradient(#ff8fa3, #e8405b); }
 .bar.small { height: 14px; max-width: 320px; }
+.bar.res { height: 13px; }
+.skill.nores { filter: grayscale(0.7) brightness(0.65); }
 
 /* ---------- create ---------- */
 #screen-create { display: flex; align-items: flex-start; justify-content: center; padding: 24px 16px; }

@@ -237,7 +237,8 @@
     const title = document.createElement('h3'); title.textContent = c.name; title.style.color = c.color;
     const p = document.createElement('p'); p.textContent = c.desc;
     const st = document.createElement('div'); st.className = 'class-statline';
-    st.textContent = `❤️ ${c.hp} HP · 🛡️ ${Math.round(c.armor * 100)}% armor · 👟 ${c.speed} speed`;
+    const res = S.resourceStats(createState.cls, 1);
+    st.textContent = `❤️ ${c.hp} HP · ${res.type === 'mana' ? '🔷' : res.type === 'stamina' ? '🟢' : '⚡'} ${res.max} ${S.RESOURCES[res.type].name} · 🛡️ ${Math.round(c.armor * 100)}% armor · 👟 ${c.speed} speed`;
     $('class-desc').append(title, p, st);
     const ul = $('class-skills');
     ul.innerHTML = '';
@@ -254,7 +255,7 @@
       const li = document.createElement('li');
       li.innerHTML = `<kbd>${key}</kbd><span class="sk-icon"></span><div><b></b><small></small></div>`;
       li.querySelector('.sk-icon').textContent = sk.icon;
-      li.querySelector('b').textContent = `${sk.name} · ${sk.cd}s${tag ? ' · ' + tag : ''}`;
+      li.querySelector('b').textContent = `${sk.name} · ${sk.cd}s · ${sk.cost ? sk.cost + ' ' + S.RESOURCES[c.resource].name.toLowerCase() : 'free'}${tag ? ' · ' + tag : ''}`;
       li.querySelector('small').textContent = sk.desc;
       ul.appendChild(li);
     };

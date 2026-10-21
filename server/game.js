@@ -20,6 +20,7 @@ class Game {
     this.zones = [];   // Magic Shield domes, Monsoon rain
     this.trees = [];   // Druid tree spirits
     this.traps = [];   // Marksman traps
+    this.potions = []; // health/mana potions dropped by monsters
     this.pets = new Map(); // Marksman wolves, keyed by owner socket id
     this.hounds = [];   // Beyonder spectral hounds
     this.scarabs = [];  // Beyonder passive scarabs
@@ -56,10 +57,14 @@ class Game {
       const now = Date.now();
       const key = S.cdIndex(p.cls, p.form, slot);
       if (now < p.cds[key] - 120) return; // small latency slack
+      // opening the second Void Portal is free (the cost was paid when placing the first)
+      const portalSecond = p.cls === 'beyonder' && p.form === 'rod' && slot === 3 && p.portalPending && now <= p.portalPending.until;
+      const cost = portalSecond ? 0 : S.skillCost(p.cls, p.form, slot);
+      if (p.res < cost) { p.socket.emit('noResource', { slot, type: p.resType }); return; }
+      p.res -= cost;
       p.cds[key] = now + this.cooldownMs(p, slot);
       p.atkSeq++;
       p.atkSlot = slot;
-      if (p.cls === 'rogue' && slot !== 0) p.hasteUntil = now + 6000;
       this.cast(p, slot, now, d);
     });
     socket.on('chat', (text) => {
@@ -114,6 +119,7 @@ class Game {
       sid: socket.id, socket, userId: user.id, charId: ch.id, name: ch.name, cls: ch.class, hair: ch.hair,
       level, xp: ch.xp, score: ch.score, kills: ch.kills, assists: ch.assists, deaths: ch.deaths, bossKills: ch.boss_kills,
       maxHp: stats.maxHp, hp: stats.maxHp, dmgMult: stats.dmgMult, armor: stats.armor,
+      ...(() => { const r = S.resourceStats(ch.class, level); return { resType: r.type, resMax: r.max, res: r.max, resRegen: r.regen, energyAt: now + S.ENERGY_TICK.everyMs }; })(),
       x: S.SPAWN.x + rand(-100, 100), y: S.SPAWN.y, facing: 1, anim: 'idle',
       dead: false, deadAt: 0, cds: new Array(S.COOLDOWN_SLOTS).fill(0), atkSeq: 0, atkSlot: 0,
       stealthUntil: 0, invulnUntil: now + 2000, ironWillUntil: 0, hitIframeUntil: 0, lastHurt: 0,
@@ -444,7 +450,6 @@ class Game {
     if (now < m.freezeUntil && !opts.freeze) dmg *= 1.25; // shatter bonus
     if (now < m.exposedUntil) dmg *= S.EXPOSED_MULT;     // Headshot debuff
     if (p.buffs & S.AURA_BITS.vengeance) dmg *= S.AURA_EFFECTS.vengeanceDamage;
-    if (now < p.furyUntil) dmg *= S.PASSIVE.furyDamage;
     if (p.cls === 'marksman' && !opts.fromPet) { const pet = this.pets.get(p.sid); if (pet) pet.target = m.id; }
     dmg = Math.max(1, Math.round(dmg));
     m.hp -= dmg;
@@ -492,11 +497,46 @@ class Game {
         this.store.rewardOffline(charId, xp, score, isKill);
       }
     }
+    this.dropPotions(m, def);
     if (def.boss) {
       this.sys(`👑 The King Slime was defeated by ${names.join(', ')}!`);
       this.nextBossAt = Date.now() + BOSS_INTERVAL_MS;
       for (const p of this.players.values()) this.savePlayer(p);
     }
+  }
+
+  dropPotions(m, def) {
+    const drops = [];
+    if (def.boss) for (let i = 0; i < 3; i++) drops.push(S.POTIONS[2]);
+    else {
+      const r = Math.random();
+      let acc = 0;
+      for (const pot of [...S.POTIONS].reverse()) { acc += pot.chance; if (r < acc) { drops.push(pot); break; } } // rarest first
+    }
+    drops.forEach((pot, i) => {
+      this.potions.push({ id: this.nid++, kind: Math.random() < 0.5 ? 'hp' : 'mp', size: pot.size, amount: pot.amount,
+        x: m.x + (i - (drops.length - 1) / 2) * 30, y: m.y, until: Date.now() + 30000 });
+    });
+  }
+
+  updatePotions(now) {
+    for (const pot of this.potions) {
+      for (const p of this.players.values()) {
+        if (p.dead || Math.abs(p.x - pot.x) > 26 || Math.abs(p.y - pot.y) > 40) continue;
+        if (pot.kind === 'hp') {
+          const amt = Math.min(p.maxHp - p.hp, pot.amount);
+          p.hp += amt;
+          this.addFx({ t: 'dmg', x: p.x, y: p.y - 70, v: amt, k: 'h' });
+        } else {
+          p.res = Math.min(p.resMax, p.res + pot.amount);
+          this.addFx({ t: 'dmg', x: p.x, y: p.y - 70, v: pot.amount, k: 'r' });
+        }
+        this.addFx({ t: 'potion', x: pot.x, y: pot.y, kind: pot.kind });
+        pot.until = 0;
+        break;
+      }
+    }
+    this.potions = this.potions.filter((pot) => pot.until > now);
   }
 
   onKillPassive(p, m) {
@@ -510,18 +550,14 @@ class Game {
       this.addFx({ t: 'transmog', x: m.x, y: m.y });
       return;
     }
-    if (p.cls === 'fighter') {
-      p.furyUntil = now + 6000;
-      this.addFx({ t: 'fury', x: p.x, y: p.y });
-    } else if (p.cls === 'mage') {
-      for (let i = 0; i < p.cds.length; i++) p.cds[i] = Math.max(0, p.cds[i] - S.PASSIVE.arcaneCdMs);
-      p.socket.emit('cdReduce', { ms: S.PASSIVE.arcaneCdMs });
-      this.addFx({ t: 'arcane', x: p.x, y: p.y });
+    if (p.cls === 'rogue') { // Haste
+      p.hasteUntil = now + 6000;
+      this.addFx({ t: 'dust', x: p.x, y: p.y });
     }
   }
 
   // ---------- passives: Marksman wolf, Druid fairy ----------
-  petMaxHp(level) { return Math.round(90 * (1 + 0.1 * (level - 1))); }
+  petMaxHp(level) { return Math.round(160 * (1 + 0.1 * (level - 1))); }
   makePet(p) {
     const hp = this.petMaxHp(p.level);
     return { x: p.x - 40, y: p.y, f: 1, hp, maxHp: hp, dead: false, respawnAt: 0, atkAt: 0, hitAt: 0, target: null, moving: false };
@@ -554,7 +590,7 @@ class Game {
         pet.atkAt = now + 900;
         pet.f = sign(target.x - pet.x);
         this.addFx({ t: 'bite', x: target.x, y: target.y - target.h / 2 });
-        this.damageMonster(target, 10, o, { fromPet: true });
+        this.damageMonster(target, 18, o, { fromPet: true });
       }
     }
   }
@@ -655,7 +691,8 @@ class Game {
   // HUD info for each class passive: active (glow) and remaining cooldown in seconds
   passiveState(p, now) {
     switch (p.cls) {
-      case 'fighter': return { pa: now < p.furyUntil ? 1 : 0, pc: 0 };
+      case 'fighter': return { pa: p.hp < p.maxHp * 0.5 ? 1 : 0, pc: 0 }; // Resilience kicking in
+      case 'mage': return { pa: p.res < p.resMax * 0.5 ? 1 : 0, pc: 0 };  // Arcane Discipline kicking in
       case 'rogue': return { pa: now < p.hasteUntil ? 1 : 0, pc: 0 };
       case 'marksman': {
         const pet = this.pets.get(p.sid);
@@ -676,6 +713,8 @@ class Game {
       const st = S.playerStats(p.cls, p.level);
       p.maxHp = st.maxHp;
       p.dmgMult = st.dmgMult;
+      const rs = S.resourceStats(p.cls, p.level);
+      p.resMax = rs.max; p.resRegen = rs.regen; p.res = p.resMax;
       p.hp = p.maxHp;
       this.addFx({ t: 'levelup', x: p.x, y: p.y });
       this.sys(`✨ ${p.name} reached level ${p.level}!`);
@@ -865,11 +904,12 @@ class Game {
       // ---- Paladin ----
       case 'paladin0': { // Holy Strike; every 10s it is empowered into Divine Strike
         const m = this.nearestInFront(p, 95, 85);
-        const divine = now >= p.divineReadyAt;
+        const divine = now >= p.divineReadyAt && p.res >= S.DIVINE_STRIKE_COST;
         if (m && divine) {
           this.damageMonster(m, 34, p, { mult: 3, stun: 1500, kb: f * 260 });
           this.addFx({ t: 'smite', x: m.x, y: m.y });
           p.divineReadyAt = now + 10000;
+          p.res -= S.DIVINE_STRIKE_COST;
         } else if (m) {
           this.damageMonster(m, 34, p, { kb: f * 120 });
         }
@@ -938,7 +978,10 @@ class Game {
       // ---- Beyonder: sword ----
       case 'beyondersword0': { // Void Slash: single target
         const m = this.nearestInFront(p, 95, 85);
-        if (m) this.damageMonster(m, 32, p, { kb: f * 120 });
+        if (m) {
+          this.damageMonster(m, 32, p, { kb: f * 120 });
+          p.res = Math.min(p.resMax, p.res + S.VOID_SLASH_RESTORE);
+        }
         this.addFx({ t: 'slash', x: p.x, y: p.y, f, c: p.cls });
         break;
       }
@@ -983,6 +1026,19 @@ class Game {
     return healedOthers;
   }
 
+  // Restores frac of max mana to every living mana user within r of (cx, cy). Returns mana given to others.
+  restoreManaAround(giver, cx, cy, r, frac) {
+    let given = 0;
+    for (const o of this.players.values()) {
+      if (o.dead || o.resType !== 'mana' || Math.hypot(o.x - cx, o.y - cy) > r) continue;
+      const amt = Math.min(o.resMax - o.res, Math.round(o.resMax * frac));
+      if (amt <= 0) continue;
+      o.res += amt;
+      if (o !== giver) given += amt;
+    }
+    return given;
+  }
+
   awardHealScore(p, healedOthers) {
     const bonus = Math.floor(healedOthers / 10);
     if (bonus <= 0) return 0;
@@ -994,6 +1050,16 @@ class Game {
 
   updatePlayerEffects(p, dt, now) {
     if (p.dead) return;
+    const missing = 1 - p.hp / p.maxHp; // 0 at full health, ~1 near death
+    if (p.resType === 'energy') {
+      if (now >= p.energyAt) { p.energyAt = now + S.ENERGY_TICK.everyMs; p.res = Math.min(p.resMax, p.res + S.ENERGY_TICK.amount); }
+    } else {
+      // Arcane Discipline: mage mana regen scales up to 4x as mana runs low
+      const mult = p.cls === 'mage' ? 1 + 3 * (1 - p.res / p.resMax) : 1;
+      p.res = Math.min(p.resMax, p.res + p.resRegen * mult * dt);
+    }
+    // Resilience: fighter HP regen (always on) scales with missing health — up to 3% max HP/s near death
+    if (p.cls === 'fighter' && missing > 0) p.hp = Math.min(p.maxHp, p.hp + p.maxHp * 0.03 * missing * dt);
     // Iron Will regen: 10% max HP over 10s
     if (now < p.ironWillUntil) p.hp = Math.min(p.maxHp, p.hp + p.maxHp * 0.01 * dt);
     // Guardian Spirits: damage pulse every 0.5s
@@ -1016,6 +1082,8 @@ class Game {
       if (aura.key === 'life' && now >= pal.lifeTickAt) {
         pal.lifeTickAt = now + 5000;
         pal.auraHealed += this.healAround(pal, pal.x, pal.y, S.AURA_RADIUS, S.AURA_EFFECTS.lifeHealFrac, 3);
+        // Aura of Vitality also restores mana; mana given to allies counts like healing for score
+        pal.auraHealed += this.restoreManaAround(pal, pal.x, pal.y, S.AURA_RADIUS, S.AURA_EFFECTS.vitalityManaFrac);
         this.addFx({ t: 'heal', x: pal.x, y: pal.y, r: S.AURA_RADIUS });
       }
     }
@@ -1150,7 +1218,10 @@ class Game {
       } else if (z.type === 'rain' && now >= z.tickAt) { // Monsoon: heal pulse every 0.5s
         z.tickAt = now + 500;
         const owner = this.players.get(z.owner);
-        if (owner) owner.auraHealed += this.healAround(owner, z.x, z.y, z.r, 0.03, 2);
+        if (owner) {
+          owner.auraHealed += this.healAround(owner, z.x, z.y, z.r, 0.03, 2);
+          owner.auraHealed += this.restoreManaAround(owner, z.x, z.y, z.r, 0.02); // Monsoon restores mana too
+        }
       }
     }
     this.zones = this.zones.filter((z) => z.until > now);
@@ -1162,6 +1233,7 @@ class Game {
     this.updateHounds(dt, now);
     this.updateScarabs(dt, now);
     this.portals = this.portals.filter((po) => po.until > now);
+    this.updatePotions(now);
     for (const p of this.players.values()) this.updatePlayerEffects(p, dt, now);
 
     // regen out of combat
@@ -1180,7 +1252,8 @@ class Game {
         f: p.facing, a: p.anim, hp: Math.ceil(p.hp), mhp: p.maxHp, sc: p.score,
         st: now < p.stealthUntil ? 1 : 0, iw: now < p.ironWillUntil ? 1 : 0, inv: now < p.invulnUntil ? 1 : 0,
         gs: now < p.guardianUntil ? 1 : 0, bf: p.buffs, bl: p.blockCharges,
-        au: p.cls === 'paladin' ? p.aura : -1, ds: p.cls === 'paladin' && now >= p.divineReadyAt ? 1 : 0,
+        au: p.cls === 'paladin' ? p.aura : -1, ds: p.cls === 'paladin' && now >= p.divineReadyAt && p.res >= S.DIVINE_STRIKE_COST ? 1 : 0,
+        rs: Math.floor(p.res), rm: p.resMax,
         fu: now < p.furyUntil ? 1 : 0, hs: now < p.hasteUntil ? 1 : 0, ivc: now < p.invincibleUntil ? 1 : 0,
         fm: p.form === 'sword' ? 1 : 0, hx: now < p.hexUntil ? 1 : 0,
         ...this.passiveState(p, now),
@@ -1205,6 +1278,7 @@ class Game {
       z: this.zones.map((z) => ({ id: z.id, t: z.type, x: z.x, y: z.y, r: z.r })),
       tz: this.trees.map((t) => ({ id: t.id, x: t.x, y: t.y, f: t.f, hp: Math.max(0, t.hp), mhp: t.maxHp, g: Math.min(1, (now - t.bornAt) / (t.growAt - t.bornAt)) })),
       tr: this.traps.map((t) => ({ id: t.id, x: t.x, y: t.y })),
+      pot: this.potions.map((pot) => ({ id: pot.id, k: pot.kind, s: pot.size, x: Math.round(pot.x), y: pot.y })),
       fx: this.fx,
       boss: this.bossAlive() ? 0 : Math.max(0, Math.round((this.nextBossAt - now) / 1000)),
     };

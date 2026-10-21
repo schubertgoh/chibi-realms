@@ -710,6 +710,32 @@
     ctx.restore();
   }
 
+  // ---------------------------------------------------------------- potions
+  // pot: { id, k: 'hp'|'mp', s: 'small'|'medium'|'large', x, y }
+  function drawPotion(ctx, pot, t) {
+    const sc = pot.s === 'large' ? 1.35 : pot.s === 'medium' ? 1.1 : 0.85;
+    const liquid = pot.k === 'hp' ? '#ff4d6d' : '#4f8dff', shine = pot.k === 'hp' ? '#ffb3c1' : '#bcd6ff';
+    ctx.save();
+    ctx.translate(pot.x, pot.y - 4 + Math.sin(t * 3 + pot.id) * 2.5);
+    ctx.scale(sc, sc);
+    const g = ctx.createRadialGradient(0, -12, 2, 0, -12, 22);
+    g.addColorStop(0, pot.k === 'hp' ? 'rgba(255,120,150,0.45)' : 'rgba(120,170,255,0.45)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, -12, 22, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = OUTLINE; ctx.lineWidth = 1.5;
+    // bottle body + neck
+    ctx.fillStyle = 'rgba(235,245,255,0.9)';
+    ctx.beginPath(); ctx.arc(0, -10, 9, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    rr(ctx, -3.5, -24, 7, 8, 2); ctx.fill(); ctx.stroke();
+    // liquid
+    ctx.fillStyle = liquid;
+    ctx.beginPath(); ctx.arc(0, -10, 7.5, -0.15, Math.PI + 0.15); ctx.closePath(); ctx.fill();
+    ell(ctx, -3, -13, 2, 3, shine);
+    // cork
+    ctx.fillStyle = '#b07a45'; rr(ctx, -4, -28, 8, 5, 2); ctx.fill(); ctx.stroke();
+    if (pot.s === 'large') drawStar(ctx, 9, -24, 3.5, '#ffe27a');
+    ctx.restore();
+  }
+
   // ---------------------------------------------------------------- marksman trap
   function drawTrap(ctx, tr, t) {
     ctx.save();
@@ -964,6 +990,6 @@
   }
 
   window.Render = {
-    rr, ell, shade, drawStar, drawChibi, drawMonster, drawSpirit, drawTreeSpirit, drawTrap, drawWolf, drawScarab, buildTerrain, buildMountains, buildHills, drawCloud,
+    rr, ell, shade, drawStar, drawChibi, drawMonster, drawSpirit, drawTreeSpirit, drawTrap, drawWolf, drawScarab, drawPotion, buildTerrain, buildMountains, buildHills, drawCloud,
   };
 })();

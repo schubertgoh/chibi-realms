@@ -87,7 +87,7 @@
         { name: 'Tree Spirit', icon: '🌳', cd: 14, desc: 'Plant a seed that grows into a fighting tree after 10s. Trees can be attacked (max 3).' },
         { name: 'Entangle', icon: '🌿', cd: 8, desc: 'Roots burst out and hold enemies in place.' },
         { name: 'Rejuvenate', icon: '💚', cd: 6, desc: 'Heal yourself and nearby allies.' },
-        { name: 'Monsoon', icon: '🌧️', cd: 22, desc: 'Summon a large healing rain for 6s that heals all allies inside it.' },
+        { name: 'Monsoon', icon: '🌧️', cd: 22, desc: 'Summon a large healing rain for 6s that heals all allies inside it and restores their mana.' },
       ],
     },
     paladin: {
@@ -95,7 +95,7 @@
       desc: 'Holy warrior in golden armor. Protects allies with auras and taunts, and smites the wicked.',
       skills: [
         { name: 'Holy Strike', icon: '🔨', cd: 0.5, desc: 'Mace hit on one target. Every 10s it becomes Divine Strike: triple damage and a stun.' },
-        { name: 'Holy Auras', icon: '🛡️', cd: 3, desc: 'Always-on aura for you and nearby allies. Press to switch: Bulwark → Zephyr → Life → Vengeance.' },
+        { name: 'Holy Auras', icon: '🛡️', cd: 3, desc: 'Always-on aura for you and nearby allies. Press to switch: Bulwark → Zephyr → Vitality → Vengeance.' },
         { name: 'Divine Bulwark', icon: '🔆', cd: 10, desc: 'A holy shield that completely blocks the next 2 hits.' },
         { name: 'Righteous Cry', icon: '📣', cd: 8, desc: 'Taunt all nearby enemies to attack you for 4s.' },
         { name: 'Guardian Spirits', icon: '👼', cd: 18, desc: 'For 6s, holy spirits swirl around you, damaging nearby foes.' },
@@ -138,12 +138,12 @@
   const AURAS = [
     { key: 'bulwark', name: 'Aura of Bulwark', icon: '🛡️', color: '#8fb8ff', desc: 'You and nearby allies take 20% less damage.' },
     { key: 'zephyr', name: 'Aura of Zephyr', icon: '🌬️', color: '#b8f5e0', desc: '+20% movement speed and 25% faster basic attacks.' },
-    { key: 'life', name: 'Aura of Life', icon: '💚', color: '#7ee08a', desc: 'Heals you and nearby allies for 5% HP every 5s.' },
+    { key: 'life', name: 'Aura of Vitality', icon: '💚', color: '#7ee08a', desc: 'Every 5s, restores 5% HP and 5% mana to you and nearby allies.' },
     { key: 'vengeance', name: 'Aura of Vengeance', icon: '🔥', color: '#ff7a5c', desc: 'You and nearby allies deal 15% more damage.' },
   ];
   const AURA_BITS = { bulwark: 1, zephyr: 2, life: 4, vengeance: 8 };
   const AURA_RADIUS = 240;
-  const AURA_EFFECTS = { bulwarkDamageTaken: 0.8, zephyrSpeed: 1.2, zephyrAttackCd: 0.75, lifeHealFrac: 0.05, vengeanceDamage: 1.15 };
+  const AURA_EFFECTS = { bulwarkDamageTaken: 0.8, zephyrSpeed: 1.2, zephyrAttackCd: 0.75, lifeHealFrac: 0.05, vitalityManaFrac: 0.05, vengeanceDamage: 1.15 };
   const EXPOSED_MULT = 1.3; // Headshot debuff
   const MAX_TRAPS = 3;
   const MAX_TREES = 3;
@@ -160,6 +160,71 @@
     paladin: { name: 'Invincible', icon: '🌟', desc: 'Dropping to 10% HP or below makes you immune to all damage for 6s. 120s cooldown.' },
   };
   for (const k of Object.keys(PASSIVES)) CLASSES[k].passive = PASSIVES[k];
+
+  // ---------------------------------------------------------------- resources
+  // mana: slow regen, grows with level · stamina: fast regen · energy: fixed 100, +10 every 3s
+  const RESOURCES = {
+    mana: { name: 'Mana', color: '#4f8dff' },
+    stamina: { name: 'Stamina', color: '#5fd36b' },
+    energy: { name: 'Energy', color: '#ffd34d' },
+  };
+  const CLASS_RESOURCE = {
+    fighter: { type: 'stamina', max: 100, regen: 10 },
+    marksman: { type: 'stamina', max: 100, regen: 10 },
+    rogue: { type: 'energy', max: 100 },
+    mage: { type: 'mana', max: 220, regen: 0.5 },
+    druid: { type: 'mana', max: 190, regen: 0.5 },
+    beyonder: { type: 'mana', max: 180, regen: 0.5 },
+    paladin: { type: 'mana', max: 120, regen: 0.5 },
+  };
+  const ENERGY_TICK = { amount: 10, everyMs: 3000 };
+  // Cost per skill slot [A, Z, X, C, V]; Beyonder sword skills in ALT_COSTS.
+  const COSTS = {
+    fighter: [5, 20, 15, 25, 30],
+    marksman: [5, 15, 15, 15, 30],
+    rogue: [0, 15, 0, 15, 35], // Backstab and Stealth are free
+    mage: [1, 10, 15, 8, 25],
+    druid: [1, 15, 12, 15, 25],
+    paladin: [0, 0, 12, 10, 20], // Holy Strike and Holy Auras are free; Divine Strike costs DIVINE_STRIKE_COST
+    beyonder: [2, 10, 15, 15, 0], // Transmogrify is free
+  };
+  const ALT_COSTS = { beyonder: [0, 10, 15, 12] }; // Void Slash is free and restores mana
+  const DIVINE_STRIKE_COST = 20;
+  const VOID_SLASH_RESTORE = 4;
+  for (const [cls, list] of Object.entries(COSTS)) CLASSES[cls].skills.forEach((sk, i) => { sk.cost = list[i]; });
+  for (const [cls, list] of Object.entries(ALT_COSTS)) CLASSES[cls].altSkills.forEach((sk, i) => { sk.cost = list[i]; });
+  for (const [cls, r] of Object.entries(CLASS_RESOURCE)) CLASSES[cls].resource = r.type;
+
+  // Rogue: energy-limited, so its other skills come back much faster
+  CLASSES.rogue.skills[1].cd = 1.2; // Knife Throw
+  CLASSES.rogue.skills[3].cd = 1.5; // Dodge Roll
+  CLASSES.rogue.skills[4].cd = 8;   // Fan of Knives
+  CLASSES.paladin.skills[0].desc = 'Free mace hit on one target. Every 10s it becomes Divine Strike (triple damage + stun) if you have ' + DIVINE_STRIKE_COST + ' mana.';
+  CLASSES.beyonder.altSkills[0].desc = 'Slash a single enemy in front with your hex sword. Each hit restores ' + VOID_SLASH_RESTORE + ' mana.';
+
+  // Passive rework to balance resources
+  CLASSES.fighter.passive = { name: 'Resilience', icon: '❤️‍🔥', desc: 'Your HP regenerates faster the lower your health is.' };
+  CLASSES.mage.passive = { name: 'Arcane Discipline', icon: '✨', desc: 'Your mana regenerates faster the lower your mana is (up to 4x when nearly empty).' };
+  CLASSES.rogue.passive = { name: 'Haste', icon: '👟', desc: 'Killing an enemy grants +30% movement speed for 6s.' };
+  CLASSES.marksman.passive.desc = 'A sturdy wolf follows you, attacks what you attack and levels up with you. If it dies it returns after 30s.';
+
+  function resourceStats(cls, level) {
+    const r = CLASS_RESOURCE[cls];
+    if (r.type === 'energy') return { type: 'energy', max: 100, regen: 0 };
+    return {
+      type: r.type,
+      max: Math.round(r.max * (1 + 0.06 * (level - 1))),
+      regen: r.regen * (1 + (r.type === 'mana' ? 0.1 : 0.03) * (level - 1)), // per second
+    };
+  }
+  function skillCost(cls, form, slot) { return skillDef(cls, form, slot).cost || 0; }
+
+  // Potions dropped by monsters: red restores HP, blue restores your class resource
+  const POTIONS = [
+    { size: 'small', amount: 50, chance: 0.075 },
+    { size: 'medium', amount: 100, chance: 0.035 },
+    { size: 'large', amount: 200, chance: 0.015 },
+  ];
 
   const MONSTERS = {
     slime: { name: 'Slime', hp: 70, dmg: 10, speed: 70, w: 44, h: 36, xp: 12, score: 10 },
@@ -190,7 +255,8 @@
 
   const Shared = {
     MAX_PLAYERS, MAX_CHARACTERS_PER_ACCOUNT, MAX_LEVEL, RESPAWN_SECONDS, WORLD, SPAWN, PLATFORMS, LADDERS,
-    HAIR_COLORS, CLASSES, MONSTERS, SKILL_LABELS, AURAS, AURA_BITS, AURA_RADIUS, AURA_EFFECTS, EXPOSED_MULT, MAX_TRAPS, MAX_TREES, PASSIVE, MAX_SCARABS, skillDef, cdIndex, COOLDOWN_SLOTS, xpForLevel, levelFromXp, playerStats,
+    HAIR_COLORS, CLASSES, MONSTERS, SKILL_LABELS, AURAS, AURA_BITS, AURA_RADIUS, AURA_EFFECTS, EXPOSED_MULT, MAX_TRAPS, MAX_TREES, PASSIVE, MAX_SCARABS, skillDef, cdIndex, COOLDOWN_SLOTS,
+    RESOURCES, CLASS_RESOURCE, ENERGY_TICK, DIVINE_STRIKE_COST, VOID_SLASH_RESTORE, resourceStats, skillCost, POTIONS, xpForLevel, levelFromXp, playerStats,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = Shared;
   else window.Shared = Shared;

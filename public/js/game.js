@@ -18,7 +18,7 @@
   const keys = new Set();
   let jumpQueued = false;
   const others = new Map(), monsters = new Map();
-  let projectiles = [], zones = [], trees = [], traps = [], pets = [], hounds = [], scarabs = [], portals = [];
+  let projectiles = [], zones = [], trees = [], traps = [], pets = [], hounds = [], scarabs = [], portals = [], potions = [];
   let portalQueued = false;
   const particles = [], floaters = [], effects = [], bubbles = new Map();
   const cds = new Array(S.COOLDOWN_SLOTS).fill(0); // Beyonder sword skills use slots 5-8
@@ -38,7 +38,8 @@
     clouds = Array.from({ length: 9 }, (_, i) => ({ x: i * 260 + Math.random() * 120, y: 40 + Math.random() * 180, s: 0.6 + Math.random() * 0.7, v: 6 + Math.random() * 10 }));
     for (const id of ['hud-name', 'hud-level', 'hp-fill', 'hp-text', 'xp-fill', 'xp-text', 'stat-score', 'stat-kills', 'stat-assists',
       'stat-online', 'online-list', 'skillbar', 'chat-log', 'chat-input', 'toasts', 'death-overlay', 'respawn-btn', 'respawn-timer',
-      'banner', 'boss-timer', 'hud-portrait', 'hud-buffs', 'passive-slot']) el[id] = document.getElementById(id);
+      'banner', 'boss-timer', 'hud-portrait', 'hud-buffs', 'passive-slot', 'res-fill', 'res-text']) el[id] = document.getElementById(id);
+    el['res-fill'].style.background = S.RESOURCES[S.CLASSES[opts.character.cls].resource].color;
     buildSkillbar(opts.character.cls);
     buildPassive(opts.character.cls);
     delete el.skillbar.dataset.form;
@@ -76,6 +77,7 @@
       toast(text, r.kill ? 'gold' : '');
     });
     socket.on('cdReset', ({ slot, msg }) => { cds[cdIdx(slot)] = 0; toast(msg); });
+    socket.on('noResource', ({ slot, type }) => { cds[cdIdx(slot)] = 0; toast(`Not enough ${S.RESOURCES[type].name.toLowerCase()}!`); });
     socket.on('cdReduce', ({ ms }) => { for (let i = 0; i < cds.length; i++) cds[i] -= ms; }); // Arcane Prowess
     socket.on('chat', ({ id, n, text }) => { addChat(n, text); bubbles.set(id, { text, until: performance.now() + 4500 }); });
     socket.on('sys', (text) => addChat(null, text));
@@ -140,11 +142,14 @@
     const now = performance.now();
     const idx = cdIdx(slot);
     if (now < cds[idx]) return;
+    const portalSecond = me.cls === 'beyonder' && me.form !== 'sword' && slot === 3 && portals.some((po) => po.o === selfId && po.pend);
+    const cost = portalSecond ? 0 : S.skillCost(me.cls, me.form, slot);
+    if ((me.rs ?? 0) < cost) { toast(`Not enough ${S.RESOURCES[S.CLASSES[me.cls].resource].name.toLowerCase()}!`); return; }
+    me.rs -= cost;
     cds[idx] = now + cooldownMs(slot);
     me.atkAt = now; me.atkSlot = slot;
     // movement-type skills are applied locally right away
     const payload = { slot };
-    if (me.cls === 'rogue' && slot !== 0) me.hasteUntil = now + 6000;
     if (me.cls === 'fighter' && slot === 1) { me.kbx = me.facing * 950; me.chargeUntil = now + 320; me.climb = null; }
     if (me.cls === 'mage' && slot === 3) { const from = teleport(); payload.fx = from.x; payload.fy = from.y; }
     if (me.cls === 'rogue' && slot === 3) { me.kbx = me.facing * 820; me.rollUntil = now + 380; }
@@ -243,7 +248,7 @@
     if (left) move -= 1;
     if (right) move += 1;
     if (move) me.facing = move;
-    const hasted = me.hasteUntil && now < me.hasteUntil;
+    const hasted = !!me.hs;
     const target = move * me.speed * (hasBuff('zephyr') ? S.AURA_EFFECTS.zephyrSpeed : 1) * (hasted ? S.PASSIVE.hasteSpeed : 1);
     const accel = me.onGround ? 18 : 7;
     me.vx += (target - me.vx) * Math.min(1, accel * dt);
@@ -311,6 +316,7 @@
           const wasDead = me.dead;
           me.hp = p.hp; me.maxHp = p.mhp; me.dead = !!p.d; me.stealth = !!p.st; me.iw = !!p.iw; me.inv = !!p.inv; me.gs = !!p.gs; me.level = p.l;
           me.bf = p.bf; me.au = p.au; me.bl = p.bl; me.ds = p.ds;
+          me.rs = p.rs; me.rm = p.rm;
           me.fu = p.fu; me.hs = p.hs; me.ivc = p.ivc; me.pa = p.pa; me.pc = p.pc; me.hx = p.hx;
           if (!(me.formLockUntil && now < me.formLockUntil)) me.form = p.fm ? 'sword' : 'rod';
           if (me.dead && !wasDead) { deadSince = now; el['death-overlay'].classList.remove('hidden'); }
@@ -344,6 +350,7 @@
     hounds = s.hd || [];
     scarabs = s.sc || [];
     portals = s.po || [];
+    potions = s.pot || [];
     for (const fx of s.fx) spawnFx(fx, now);
     updateOnlineList(s.p);
   }
@@ -402,6 +409,7 @@
       case 'phasedash': effects.push({ ...fx, born: now, dur: 320 }); burst(fx.x1, fx.y - 30, 14, ['#7b3fd6', '#c9a8ff'], 160, { g: 0, size: 4 }); break;
       case 'transmog': burst(fx.x, fx.y - 30, 20, ['#7b3fd6', '#1a0d2a', '#c9a8ff', '#ffffff'], 200, { g: -30, shape: 'star', size: 4 }); break;
       case 'hex': burst(fx.x, fx.y - 34, 16, ['#b48cff', '#ffffff'], 180, { g: 0, shape: 'shard', size: 5 }); break;
+      case 'potion': burst(fx.x, fx.y - 14, 16, fx.kind === 'hp' ? ['#ff6b81', '#ffd1d9', '#ffffff'] : ['#6fa8ff', '#cfe0ff', '#ffffff'], 160, { g: -60, shape: 'plus', size: 5 }); break;
       case 'dodge': floaters.push({ x: fx.x, y: fx.y - 75, v: 'DODGE', k: 'a', born: now }); break;
       case 'summon': burst(fx.x, fx.y, 26, ['#9ef2a8', '#ffffff', '#5fe07a'], 200, { g: -30, shape: 'star', size: 4 }); break;
       case 'spirit': effects.push({ ...fx, born: now, dur: 220 }); burst(fx.x2, fx.y2, 6, ['#9ef2a8', '#fff'], 160, { g: 0, size: 3 }); break;
@@ -475,6 +483,7 @@
     for (const pt of pets) if (!pt.d) R.drawWolf(ctx, pt, now / 1000);
     for (const po of portals) drawPortalPair(po, now);
     for (const sc of scarabs) R.drawScarab(ctx, sc, now / 1000);
+    for (const pot of potions) R.drawPotion(ctx, pot, now / 1000);
     for (const h of hounds) R.drawWolf(ctx, h, now / 1000, 'spectral');
     drawAuraRings(now);
     for (const m of monsters.values()) R.drawMonster(ctx, { ...m, x: m.rx }, now / 1000);
@@ -554,7 +563,7 @@
     const climbing = isMe ? !!p.climb : anim === 'climb';
     const rolling = isMe && p.rollUntil && now < p.rollUntil;
     const charging = isMe && p.chargeUntil && now < p.chargeUntil;
-    const hasteOn = isMe ? (p.hasteUntil && now < p.hasteUntil) : p.hs;
+    const hasteOn = p.hs;
     if (p.fu) drawFury(now);
     if (hasteOn && (isMe ? Math.abs(p.vx) > 30 : p.a === 'walk')) drawHaste(isMe ? p.facing : p.f, now);
     if (p.ivc) drawInvincible(now);
@@ -1109,7 +1118,7 @@
       ctx.globalAlpha = k > 0.7 ? (1 - k) / 0.3 : 1;
       const size = f.k === 'c' ? 26 : f.k === 'a' ? 16 : 20;
       ctx.font = `800 ${size}px Fredoka, sans-serif`; ctx.textAlign = 'center';
-      const colors = { m: ['#ffb03c', '#7a2a00'], c: ['#ff4d6d', '#5a0018'], p: ['#b48cff', '#2a1a4a'], h: ['#6ef08a', '#0d4a1c'], b: ['#ffe27a', '#7a4a00'], a: ['#ffffff', '#3a2a4a'] };
+      const colors = { m: ['#ffb03c', '#7a2a00'], c: ['#ff4d6d', '#5a0018'], p: ['#b48cff', '#2a1a4a'], h: ['#6ef08a', '#0d4a1c'], r: ['#7fb2ff', '#0d2a5a'], b: ['#ffe27a', '#7a4a00'], a: ['#ffffff', '#3a2a4a'] };
       const [fill, stroke] = colors[f.k] || colors.m;
       const txt = (f.k === 'h' ? '+' : '') + f.v + (f.k === 'c' ? '!' : '');
       ctx.lineWidth = 5; ctx.strokeStyle = stroke; ctx.lineJoin = 'round'; ctx.strokeText(txt, 0, 0);
@@ -1125,7 +1134,7 @@
     S.CLASSES[cls].skills.forEach((sk, i) => {
       const d = document.createElement('div');
       d.className = 'skill';
-      d.title = `${sk.name} (${sk.cd}s) — ${sk.desc}`;
+      d.title = `${sk.name} (${sk.cd}s${sk.cost ? ', ' + sk.cost + ' ' + S.RESOURCES[S.CLASSES[cls].resource].name.toLowerCase() : ''}) — ${sk.desc}`;
       d.innerHTML = `<div class="skill-icon"></div><div class="skill-key"></div><div class="skill-name"></div><div class="skill-cd"></div>`;
       d.querySelector('.skill-icon').textContent = sk.icon;
       d.querySelector('.skill-key').textContent = SKILL_LABELS[i];
@@ -1150,7 +1159,7 @@
       const sk = S.skillDef(me.cls, me.form, i), slotEl = el.skillbar.children[i];
       slotEl.querySelector('.skill-icon').textContent = sk.icon;
       slotEl.querySelector('.skill-name').textContent = sk.name;
-      slotEl.title = `${sk.name} (${sk.cd}s) — ${sk.desc}`;
+      slotEl.title = `${sk.name} (${sk.cd}s${sk.cost ? ', ' + sk.cost + ' mana' : ''}) — ${sk.desc}`;
     }
     const v = el.skillbar.children[4];
     v.querySelector('.skill-name').textContent = me.form === 'sword' ? 'To Rod' : 'To Sword';
@@ -1171,6 +1180,13 @@
     if (!me || !myInfo) return;
     el['hp-fill'].style.width = `${Math.max(0, (me.hp / me.maxHp) * 100)}%`;
     el['hp-text'].textContent = `${Math.ceil(me.hp)} / ${me.maxHp}`;
+    if (me.rm) {
+      el['res-fill'].style.width = `${Math.max(0, (me.rs / me.rm) * 100)}%`;
+      el['res-text'].textContent = `${Math.max(0, Math.floor(me.rs))} / ${me.rm} ${S.RESOURCES[S.CLASSES[me.cls].resource].name}`;
+    }
+    // dim skills you can't afford right now
+    const kids = el.skillbar.children;
+    for (let i = 0; i < kids.length; i++) kids[i].classList.toggle('nores', (me.rs ?? 0) < S.skillCost(me.cls, me.form, i));
     const children = el.skillbar.children;
     for (let i = 0; i < children.length; i++) {
       const remain = cds[cdIdx(i)] - now;
