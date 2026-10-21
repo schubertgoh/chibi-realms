@@ -368,20 +368,22 @@ class Game {
 
       if (def.boss) this.updateBoss(m, dt, now);
 
+      // Righteous Cry weakens taunted monsters
+      const hit = Math.round(def.dmg * (now < m.tauntUntil ? S.TAUNT_DAMAGE_MULT : 1));
       // contact damage to players
       for (const p of this.players.values()) {
         if (p.dead) continue;
         if (Math.abs(p.x - m.x) < m.w / 2 + 12 && p.y > m.y - m.h - 10 && p.y - 50 < m.y) {
-          this.hurtPlayer(p, def.dmg, m.x, now);
+          this.hurtPlayer(p, hit, m.x, now);
         }
       }
       // contact damage to grown trees
       for (const t of this.trees) {
         if (now < t.growAt || now < t.hitAt) continue;
         if (Math.abs(t.x - m.x) < m.w / 2 + 18 && Math.abs(t.y - m.y) < 20) {
-          t.hp -= def.dmg;
+          t.hp -= hit;
           t.hitAt = now + 800;
-          this.addFx({ t: 'dmg', x: t.x, y: t.y - 90, v: def.dmg, k: 'p' });
+          this.addFx({ t: 'dmg', x: t.x, y: t.y - 90, v: hit, k: 'p' });
           if (t.hp <= 0) this.addFx({ t: 'treedeath', x: t.x, y: t.y });
         }
       }
@@ -389,9 +391,9 @@ class Game {
       for (const pet of this.pets.values()) {
         if (pet.dead || now < pet.hitAt) continue;
         if (Math.abs(pet.x - m.x) < m.w / 2 + 14 && Math.abs(pet.y - m.y) < 20) {
-          pet.hp -= def.dmg;
+          pet.hp -= hit;
           pet.hitAt = now + 800;
-          this.addFx({ t: 'dmg', x: pet.x, y: pet.y - 40, v: def.dmg, k: 'p' });
+          this.addFx({ t: 'dmg', x: pet.x, y: pet.y - 40, v: hit, k: 'p' });
           if (pet.hp <= 0) {
             pet.dead = true;
             pet.respawnAt = now + 30000;
@@ -404,7 +406,7 @@ class Game {
       for (const sc of this.scarabs) {
         if (sc.hp <= 0 || now < sc.hitAt) continue;
         if (Math.abs(sc.x - m.x) < m.w / 2 + 10 && Math.abs(sc.y - m.y) < 20) {
-          sc.hp -= def.dmg;
+          sc.hp -= hit;
           sc.hitAt = now + 800;
           if (sc.hp <= 0) this.addFx({ t: 'petdeath', x: sc.x, y: sc.y });
         }
@@ -420,7 +422,7 @@ class Game {
       m.stompT = rand(5, 7);
       this.addFx({ t: 'stomp', x: m.x, y: m.y });
       for (const p of this.players.values()) {
-        if (!p.dead && Math.abs(p.y - m.y) < 12 && Math.abs(p.x - m.x) < 460) this.hurtPlayer(p, 22, m.x, now, true);
+        if (!p.dead && Math.abs(p.y - m.y) < 12 && Math.abs(p.x - m.x) < 460) this.hurtPlayer(p, Math.round(22 * (now < m.tauntUntil ? S.TAUNT_DAMAGE_MULT : 1)), m.x, now, true);
       }
     }
     if (m.summonT <= 0) {
