@@ -210,6 +210,9 @@ kbd { font-family: inherit; font-weight: 700; background: #3a2a4a; color: #fff; 
 #chat-input::placeholder { color: rgba(255,255,255,0.6); }
 
 .leave-btn { position: absolute; top: 12px; left: 360px; font-size: 13px; padding: 6px 12px; }
+.music-ctl { position: absolute; top: 12px; left: 462px; display: flex; align-items: center; gap: 6px; }
+.music-ctl .btn { font-size: 13px; padding: 6px 10px; }
+.music-ctl input { width: 90px; accent-color: var(--primary); cursor: pointer; }
 .boss-timer { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); font-weight: 600; text-shadow: 0 2px 3px rgba(0,0,0,0.6); pointer-events: none !important; }
 .banner {
   position: absolute; top: 22%; left: 50%; transform: translate(-50%, -20px) scale(0.9); opacity: 0;
@@ -240,5 +243,6 @@ kbd { font-family: inherit; font-weight: 700; background: #3a2a4a; color: #fff; 
   .logo { font-size: 40px; }
   .hud-me { width: 260px; }
   .leave-btn { top: auto; bottom: 170px; left: 12px; }
+  .music-ctl { top: auto; bottom: 170px; left: 112px; }
   .online-panel, .chat { display: none; }
 }

@@ -105,6 +105,7 @@
     });
 
     running = true;
+    window.Music.start();
     lastFrame = performance.now();
     requestAnimationFrame(frame);
   }
@@ -112,6 +113,7 @@
   function stop(message) {
     if (!running) return;
     running = false;
+    window.Music.stop();
     window.removeEventListener('resize', resize);
     window.removeEventListener('keydown', onKeyDown);
     window.removeEventListener('keyup', onKeyUp);
@@ -129,7 +131,7 @@
       speed: st.speed, jump: st.jump, hp: info.maxHp, maxHp: info.maxHp, dead: false, atkAt: -1, atkSlot: 0, stealth: false };
     updateStatsHud();
     drawPortrait();
-    addChat(null, 'Welcome to Wild Realms! Arrow keys move, Space jumps, A Z X C V use skills, Enter to chat. Type /farm in chat to auto farm.');
+    addChat(null, 'Welcome to Wild Realms! Arrow keys move, Space jumps, A Z X C V use skills, Enter to chat, M mutes music. Type /farm in chat to auto farm.');
   }
 
   // ------------------------------------------------------------------ input
@@ -151,6 +153,7 @@
     if (e.code === 'Enter') { if (chatCollapsed()) setChatCollapsed(false); el['chat-input'].focus(); e.preventDefault(); clearKeys(); return; }
     if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'AltLeft', 'AltRight', 'Tab'].includes(e.code)) e.preventDefault();
     if (e.code === 'Tab') { document.getElementById('online-panel').classList.toggle('collapsed'); return; }
+    if (e.code === 'KeyM' && !e.repeat) { window.Music.toggleMute(); return; }
     // any movement or skill key takes back control from auto farm
     if (farming && !e.repeat && (Object.values(KEYMAP).flat().includes(e.code) || SKILL_KEYS.flat().includes(e.code))) stopFarming();
     if (!e.repeat && isKey(e.code, 'jump')) jumpQueued = true;
@@ -1346,6 +1349,18 @@
       el['chat-log'].scrollTop = el['chat-log'].scrollHeight;
     }
   }
+  (function initMusicControls() {
+    const mute = document.getElementById('music-mute'), vol = document.getElementById('music-volume');
+    mute.addEventListener('click', () => { window.Music.toggleMute(); mute.blur(); });
+    vol.addEventListener('input', () => window.Music.setVolume(vol.value / 100));
+    vol.addEventListener('change', () => vol.blur()); // give the arrow keys back to the game
+    window.Music.onChange((s) => {
+      mute.textContent = s.muted || s.volume === 0 ? '🔇' : '🔊';
+      mute.title = s.muted ? 'Unmute music (M)' : 'Mute music (M)';
+      vol.value = Math.round(s.volume * 100);
+    });
+  })();
+
   (function initChatToggle() {
     const btn = document.getElementById('chat-toggle');
     btn.addEventListener('mousedown', (e) => e.preventDefault()); // keep focus off the button so Space still jumps

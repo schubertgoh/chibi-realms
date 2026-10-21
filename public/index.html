@@ -131,6 +131,10 @@
       </div>
 
       <button class="btn ghost leave-btn" id="leave-btn">⟵ Leave</button>
+      <div class="music-ctl" id="music-ctl">
+        <button class="btn ghost" id="music-mute" type="button" title="Mute music (M)">🔊</button>
+        <input id="music-volume" type="range" min="0" max="100" step="1" aria-label="Music volume" title="Music volume">
+      </div>
 
       <div id="death-overlay" class="death-overlay hidden">
         <div class="card">
@@ -147,6 +151,7 @@
   <script src="/socket.io/socket.io.js"></script>
   <script src="js/shared.js"></script>
   <script src="js/render.js"></script>
+  <script src="js/music.js"></script>
   <script src="js/game.js"></script>
   <script src="js/app.js"></script>
 </body>
