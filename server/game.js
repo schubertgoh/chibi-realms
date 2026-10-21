@@ -41,7 +41,7 @@ class Game {
     socket.on('join', (d) => this.onJoin(socket, d || {}));
     socket.on('state', (d) => {
       const p = socket.data.player;
-      if (!p || p.dead || !d) return;
+      if (!p || p.dead || !d || p.pilot) return; // auto farm owns the position
       const num = (v, a, b) => (typeof v === 'number' && Number.isFinite(v) ? clamp(v, a, b) : null);
       const x = num(d.x, 0, S.WORLD.w), y = num(d.y, 0, S.WORLD.h);
       if (x === null || y === null) return;
@@ -56,6 +56,10 @@ class Game {
     socket.on('chat', (text) => {
       const p = socket.data.player;
       if (p) this.playerChat(p, text);
+    });
+    socket.on('autofarm', (on) => {
+      const p = socket.data.player;
+      if (p && !on && this.bots) this.bots.stopFarm(p);
     });
     socket.on('respawn', () => {
       const p = socket.data.player;
@@ -158,6 +162,7 @@ class Game {
     p.lastChat = now;
     const clean = text.replace(/\s+/g, ' ').trim().slice(0, 120);
     if (!clean) return;
+    if (!p.isBot && this.bots && this.bots.command(p, clean)) return;
     this.io.emit('chat', { id: p.sid, n: p.name, text: clean });
     if (this.bots) this.bots.onChat(p, clean);
   }
@@ -170,6 +175,7 @@ class Game {
     p.y = S.SPAWN.y;
     p.invulnUntil = Date.now() + 2000;
     p.socket.emit('teleport', { x: p.x, y: p.y, f: p.facing });
+    if (p.pilot) p.pilot.onEvent('teleport');
   }
 
   removePlayer(p) {
@@ -458,6 +464,7 @@ class Game {
       this.addFx({ t: 'invincible', x: p.x, y: p.y });
     }
     p.socket.emit('hurt', { kb: sign(p.x - fromX) });
+    if (p.pilot) p.pilot.onEvent('hurt', { kb: sign(p.x - fromX) });
     if (p.hp <= 0) {
       p.hp = 0;
       p.dead = true;

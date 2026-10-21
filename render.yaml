@@ -13,6 +13,9 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "24"
+      # AI companion brain. Set the value in the Render dashboard (Environment tab); .env is not deployed.
+      - key: OPENCODE_API_KEY
+        sync: false
       # Free instances have no persistent disk, so accounts reset when the service restarts or redeploys.
       # To keep data: switch to a paid plan, add a disk mounted at /var/data, and uncomment below.
       # - key: DATA_DIR

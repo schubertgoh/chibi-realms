@@ -54,6 +54,16 @@ Optional settings: `AI_MODEL` (model ID), `AI_EFFORT` (`low` by default, for sna
 companions still play and understand plain commands: follow, protect, hunt, boss, hold, retreat, or a
 skill name.
 
+### Auto farm
+
+Your own character can use the same autopilot. Type these in chat (only you see the replies):
+
+- `/farm`: hunt the nearest monsters anywhere on the map
+- `/farm boss`: go for the King Slime, hunting until it appears
+- `/farm off` or `/stop`: take back control (pressing any movement or skill key also does this)
+
+While auto farm runs, the server moves your character and respawns it if it gets knocked out.
+
 ## Deploy online (Render)
 
 The game needs a running Node server for logins, the database and real-time play, so it can't be

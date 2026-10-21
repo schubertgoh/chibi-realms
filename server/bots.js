@@ -123,7 +123,10 @@ function ladderAt(x, y, wantUp) {
 function makeLlm() {
   if (/^(0|off|false|no)$/i.test(process.env.AI_AGENT || '')) return null;
   let Anthropic;
-  try { Anthropic = require('@anthropic-ai/sdk').default; } catch { return null; }
+  try { Anthropic = require('@anthropic-ai/sdk').default; } catch {
+    if (process.env.ANTHROPIC_API_KEY || process.env.OPENCODE_API_KEY) console.warn('AI companions: an API key is set but @anthropic-ai/sdk is not installed. Run `npm install`.');
+    return null;
+  }
   let client, model, provider;
   if (process.env.ANTHROPIC_API_KEY) {
     client = new Anthropic();
@@ -311,11 +314,15 @@ class Bot {
     this.p = this.game.addPlayer(socket, ch.user_id, ch, true);
     this.system = systemPrompt({ ...this.def, name: this.p.name }, this.p.cls);
     if (near) { this.p.x = clamp(near.x + this.def.offset, 20, S.WORLD.w - 20); this.p.y = near.y; }
+    this.resetBody();
+    this.game.sys(`🤖 ${this.p.name} the ${S.CLASSES[this.p.cls].name} (AI companion) joined the realm!`);
+    return true;
+  }
+
+  resetBody() {
     this.body = { vx: 0, vy: 0, kbx: 0, onGround: platIndexAt(this.p.x, this.p.y) >= 0, climb: null, dropUntil: 0,
       rollUntil: 0, stuckT: 0, lastX: this.p.x, lastY: this.p.y, unstickUntil: 0, unstickDir: 1 };
     this.nextCastAt = 0;
-    this.game.sys(`🤖 ${this.p.name} the ${S.CLASSES[this.p.cls].name} (AI companion) joined the realm!`);
-    return true;
   }
 
   despawn(reason) {
@@ -398,7 +405,7 @@ class Bot {
     if (p.dead) {
       if (!this.deathSeen) {
         this.deathSeen = true;
-        this.mgr.unprompted(this, `You were just knocked out by monsters and will respawn at spawn in ${S.RESPAWN_SECONDS} seconds. React in one short line.`);
+        this.onKnockedOut();
       }
       this.body.climb = null;
       if (now - p.deadAt >= RESPAWN_DELAY_MS + 1500) this.game.respawnPlayer(p);
@@ -409,6 +416,10 @@ class Bot {
     // Sub-step at ~120Hz like a browser frame: at the 20Hz server tick a jump tops out ~7px short of the next floor.
     const n = Math.ceil(dt / PHYS_DT);
     for (let i = 0; i < n; i++) this.step(dt / n, now, i === 0 ? inp : { ...inp, jump: false });
+  }
+
+  onKnockedOut() {
+    this.mgr.unprompted(this, `You were just knocked out by monsters and will respawn at spawn in ${S.RESPAWN_SECONDS} seconds. React in one short line.`);
   }
 
   monsterTarget(now, anchor, radius, bossOnly, sameFloor) {
@@ -822,6 +833,33 @@ ${this.notes.length ? `\nYour notes:\n${this.notes.map((n) => '- ' + n).join('\n
   }
 }
 
+// ------------------------------------------------------------------ auto farm
+// Drives a real player's own character with the companion autopilot, toggled with /farm in chat.
+// While it runs the server owns the character's position; the browser just follows the snapshots.
+const FARM_MODES = { hunt: 'hunting the nearest monsters', boss: 'fighting the King Slime (hunting until it appears)' };
+const FARM_HELP = 'Auto farm: /farm (hunt monsters), /farm boss (go for the King Slime), /farm off (or move/use a skill) to take back control.';
+
+class Pilot extends Bot {
+  constructor(mgr, p, mode) {
+    super(mgr, { name: p.name, offset: 0 });
+    this.p = p;
+    this.aura = p.aura; // paladin: keep the aura the player picked
+    this.order = { mode, attack: true };
+    this.resetBody();
+  }
+
+  get active() { return this.game.players.get(this.p.sid) === this.p && this.p.pilot === this; }
+  onKnockedOut() {} // no agent to wake; update() respawns us automatically
+
+  cast(slot, now) {
+    const p = this.p;
+    const key = S.cdIndex(p.cls, p.form, slot);
+    if (!super.cast(slot, now)) return false;
+    p.socket.emit('autoCast', { slot, i: key, ms: Math.max(0, p.cds[key] - now) }); // keep the player's skill bar in sync
+    return true;
+  }
+}
+
 // ------------------------------------------------------------------ manager
 class Bots {
   constructor(game) {
@@ -866,6 +904,39 @@ class Bots {
 
   update(dt, now) {
     for (const b of this.bots) if (b.active) b.update(dt, now);
+    for (const p of this.game.players.values()) if (p.pilot) p.pilot.update(dt, now);
+  }
+
+  // Chat commands starting with "/" are private to the sender. Returns true if handled.
+  command(p, text) {
+    if (!text.startsWith('/')) return false;
+    const [cmd, arg = ''] = text.slice(1).toLowerCase().split(' ');
+    const tell = (msg) => p.socket.emit('sys', msg);
+    if (cmd !== 'farm' && cmd !== 'stop') { tell(`Unknown command /${cmd}. ${FARM_HELP}`); return true; }
+    if (cmd === 'stop' || ['off', 'stop'].includes(arg)) {
+      if (!this.stopFarm(p)) tell('Auto farm is not running.');
+      return true;
+    }
+    const mode = arg === '' || arg === 'on' ? 'hunt' : arg;
+    if (!FARM_MODES[mode]) { tell(FARM_HELP); return true; }
+    this.startFarm(p, mode);
+    tell(`🌾 Auto farm on: ${FARM_MODES[mode]}. Move, use a skill or type /farm off to take back control.`);
+    return true;
+  }
+
+  startFarm(p, mode) {
+    if (p.isBot) return;
+    if (p.pilot) { p.pilot.order = { mode, attack: true }; return; }
+    p.pilot = new Pilot(this, p, mode);
+    p.socket.emit('autofarm', { on: true, mode });
+  }
+
+  stopFarm(p) {
+    if (!p.pilot) return false;
+    p.pilot = null;
+    p.socket.emit('autofarm', { on: false, x: p.x, y: p.y, f: p.facing });
+    p.socket.emit('sys', '🌾 Auto farm off. You have control again.');
+    return true;
   }
 
   record(entry) {

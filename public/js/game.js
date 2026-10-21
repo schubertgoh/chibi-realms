@@ -26,6 +26,7 @@
   let clouds = [];
   let bossCountdown = 0;
   let deadSince = 0;
+  let farming = false; // auto farm: the server drives our character and we follow its snapshots
   const el = {};
 
   // ------------------------------------------------------------------ lifecycle
@@ -46,6 +47,7 @@
 
     others.clear(); monsters.clear(); projectiles = []; zones = []; trees = []; traps = []; pets = []; hounds = []; scarabs = []; portals = [];
     cds.fill(0);
+    farming = false;
     lastBuffKey = ''; el['hud-buffs'].innerHTML = '';
     particles.length = 0; floaters.length = 0; effects.length = 0; bubbles.clear();
     el['chat-log'].innerHTML = '';
@@ -82,6 +84,25 @@
     socket.on('chat', ({ id, n, text }) => { addChat(n, text); bubbles.set(id, { text, until: performance.now() + 4500 }); });
     socket.on('sys', (text) => addChat(null, text));
     socket.on('banner', ({ text, kind }) => showBanner(text, kind));
+    socket.on('autofarm', (d) => {
+      const was = farming;
+      farming = !!d.on;
+      if (!me || (!farming && !was)) return; // we already took control back locally
+      if (farming) { me.sx = me.x; me.sy = me.y; toast('🌾 Auto farm on'); }
+      else {
+        Object.assign(me, { x: d.x, y: d.y, facing: d.f, vx: 0, vy: 0, kbx: 0, climb: null });
+        me.onGround = !!platformUnder(me.x, me.y);
+        toast('Auto farm off');
+      }
+    });
+    socket.on('autoCast', ({ slot, i, ms }) => {
+      if (!me) return;
+      const now = performance.now();
+      cds[i] = now + ms;
+      me.atkAt = now; me.atkSlot = slot;
+      const b = el.skillbar.children[slot];
+      if (b) { b.classList.remove('pressed'); void b.offsetWidth; b.classList.add('pressed'); }
+    });
 
     running = true;
     lastFrame = performance.now();
@@ -108,7 +129,7 @@
       speed: st.speed, jump: st.jump, hp: info.maxHp, maxHp: info.maxHp, dead: false, atkAt: -1, atkSlot: 0, stealth: false };
     updateStatsHud();
     drawPortrait();
-    addChat(null, 'Welcome to Wild Realms! Arrow keys move, Space jumps, A Z X C V use skills, Enter to chat.');
+    addChat(null, 'Welcome to Wild Realms! Arrow keys move, Space jumps, A Z X C V use skills, Enter to chat. Type /farm in chat to auto farm.');
   }
 
   // ------------------------------------------------------------------ input
@@ -130,12 +151,33 @@
     if (e.code === 'Enter') { if (chatCollapsed()) setChatCollapsed(false); el['chat-input'].focus(); e.preventDefault(); clearKeys(); return; }
     if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'AltLeft', 'AltRight', 'Tab'].includes(e.code)) e.preventDefault();
     if (e.code === 'Tab') { document.getElementById('online-panel').classList.toggle('collapsed'); return; }
+    // any movement or skill key takes back control from auto farm
+    if (farming && !e.repeat && (Object.values(KEYMAP).flat().includes(e.code) || SKILL_KEYS.flat().includes(e.code))) stopFarming();
     if (!e.repeat && isKey(e.code, 'jump')) jumpQueued = true;
     if (!e.repeat && e.code === 'ArrowUp') portalQueued = true;
     if (!e.repeat) SKILL_KEYS.forEach((ks, i) => { if (ks.includes(e.code)) useSkill(i); });
     keys.add(e.code);
   }
   function onKeyUp(e) { keys.delete(e.code); }
+
+  function stopFarming() {
+    farming = false; // the server confirms with 'autofarm' and our exact position
+    if (me) { me.x = me.sx ?? me.x; me.y = me.sy ?? me.y; me.climb = null; me.vx = 0; me.vy = 0; }
+    socket.emit('autofarm', false);
+  }
+
+  // While auto farming, glide toward the server's position and mirror its animation state.
+  function followServer(dt) {
+    if (!me || me.sx === undefined) return;
+    const k = Math.min(1, dt * 14);
+    if (Math.abs(me.sx - me.x) > 200 || Math.abs(me.sy - me.y) > 200) { me.x = me.sx; me.y = me.sy; }
+    me.x += (me.sx - me.x) * k;
+    me.y += (me.sy - me.y) * k;
+    me.vx = me.sa === 'walk' ? me.facing * 100 : 0;
+    me.vy = me.sa === 'climb' ? 100 : 0;
+    me.climb = me.sa === 'climb' ? { x: me.x } : null;
+    me.onGround = me.sa !== 'jump';
+  }
 
   function useSkill(slot) {
     if (!me || me.dead) return;
@@ -317,6 +359,8 @@
           me.hp = p.hp; me.maxHp = p.mhp; me.dead = !!p.d; me.stealth = !!p.st; me.iw = !!p.iw; me.inv = !!p.inv; me.gs = !!p.gs; me.level = p.l;
           me.bf = p.bf; me.au = p.au; me.bl = p.bl; me.ds = p.ds;
           me.rs = p.rs; me.rm = p.rm;
+          me.sx = p.x; me.sy = p.y; me.sa = p.a;
+          if (farming) me.facing = p.f;
           me.fu = p.fu; me.hs = p.hs; me.ivc = p.ivc; me.pa = p.pa; me.pc = p.pc; me.hx = p.hx;
           if (!(me.formLockUntil && now < me.formLockUntil)) me.form = p.fm ? 'sword' : 'rod';
           if (me.dead && !wasDead) { deadSince = now; el['death-overlay'].classList.remove('hidden'); }
@@ -428,8 +472,8 @@
     const dt = Math.min(0.05, (ts - lastFrame) / 1000);
     lastFrame = ts;
     time += dt;
-    updateMe(dt, ts);
-    sendState(false);
+    if (farming) followServer(dt);
+    else { updateMe(dt, ts); sendState(false); }
 
     const k = Math.min(1, dt * 14);
     for (const o of others.values()) { o.rx += (o.x - o.rx) * k; o.ry += (o.y - o.ry) * k; if (Math.abs(o.x - o.rx) > 300) { o.rx = o.x; o.ry = o.y; } }
